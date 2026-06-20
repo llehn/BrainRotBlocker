@@ -4,8 +4,28 @@ BrainRotBlocker is a planned Windows application for limiting Instagram
 doom-scrolling while retaining access to useful surfaces such as Direct
 Messages and Stories.
 
-The project is currently in the design phase. See [idea.md](idea.md) for the
-original concept and [plan.md](plan.md) for the production roadmap.
+See [idea.md](idea.md) for the original concept and [plan.md](plan.md) for the
+production roadmap.
+
+## Status
+
+The browser-independent **core product model** is implemented and tested
+(`src/BrainRotBlocker.Core`): configurable URL rules, recurring budget groups
+with N-to-M rule assignment, selected-tab-per-window time accounting, and the
+exhausted-budget tab-closing decision (plan §5.2, ADR-004/005/006). The browser
+observation layer (plan §5.3) is the next workstream.
+
+### Build and test
+
+The solution targets .NET 8 (LTS) and the core has no OS dependency.
+
+```sh
+dotnet build
+dotnet test
+```
+
+The rule set is configurable without recompiling; see
+[config/default-config.json](config/default-config.json).
 
 ## Architecture Decision Records
 
@@ -428,3 +448,73 @@ be wrong. The guiding rule is to prefer blocking in uncertain cases.
 - Users may lose budget while a matching selected tab is open in a background
   window. This is accepted because that tab is still the current page of that
   window.
+
+### ADR-006: Core Model Implementation
+
+- **Status:** Accepted
+- **Date:** 2026-06-20
+
+#### Context
+
+The first implementation step (plan §5.2 and the First Milestone) is the
+browser-independent core: rules, budget groups, time accounting, and the
+blocking decision. ADR-004 and ADR-005 fix the behavior; this ADR records the
+concrete decisions made while implementing it in C# (`BrainRotBlocker.Core`,
+targeting .NET 8). It does not change any prior decision.
+
+#### Decision
+
+- **Language/runtime.** The core library targets `net8.0` and has no Windows or
+  UI Automation dependency, so it stays deterministic and testable on any
+  platform. The eventual enforcement layer (UI Automation, service,
+  self-protection) builds on top of it.
+- **Pure, clock-injected engine.** `BudgetEngine.Tick(windows, now)` is the only
+  entry point. The caller supplies the browser snapshot and the current instant
+  every tick; the engine owns no clock and no OS state, which makes the whole
+  model reproducible in tests.
+- **Selected-tab-only input.** The engine consumes a list of
+  `BrowserWindowState { WindowId, Url }` — one entry per open window, its
+  selected tab/current page only (ADR-005). Non-selected tabs are simply not
+  represented.
+- **Tumbling budget windows.** A budget resets on fixed tumbling windows of
+  length `ResetInterval` aligned to an `Anchor` (default Unix epoch, UTC).
+  Tumbling rather than rolling windows keep accounting deterministic and cheap,
+  matching the product's preference for the simplest model that works. Time that
+  straddles a window boundary is only charged to the window it actually falls
+  in, so a fresh allowance is never over-charged.
+- **Charge once per affected budget.** Each tick computes the union of budgets
+  consumed across all matching selected tabs and charges the elapsed interval to
+  each affected budget exactly once, never multiplied by the number of windows
+  (ADR-005).
+- **Sleep/lock via a gap clamp, not power detection.** An inter-tick gap larger
+  than `MaxAccountedGap` (default 5s, suited to ~1s polling) is clamped, so a
+  sleeping or locked machine does not drain the budget. This realizes "system
+  sleep and screen lock may pause accounting" with no explicit power or idle
+  detection, honoring the "prefer the simple model" guidance.
+- **Configurable rule set.** Rules and budgets load from JSON
+  (`ConfigurationLoader`, sample at `config/default-config.json`) so new
+  doom-scrolling surfaces can be added without recompiling (ADR-004). A built-in
+  `DefaultConfiguration` provides a starting point and the shipped JSON is
+  guarded by a test.
+
+#### Rejected Alternatives
+
+- **Rolling/sliding budget windows.** Rejected for the first model: more state
+  and complexity than tumbling windows, with no clear product benefit yet.
+- **Explicit idle/power-state detection to pause accounting.** Rejected per
+  ADR-005; the gap clamp covers the real case (sleep/lock) without extra
+  detection that can be wrong or create bypasses.
+- **An engine that reads the wall clock itself.** Rejected because it would make
+  the core non-deterministic and hard to test; the clock is injected per tick.
+
+#### Consequences
+
+- The core has thorough unit coverage (URL matching, tumbling windows,
+  configuration validation, the loader, and the full accounting/closing
+  behavior including shared budgets, multi-window non-multiplication, reset,
+  reopen-before-reset, and the sleep clamp).
+- Persistence of budget state across restarts is not yet implemented; it is
+  needed before strict mode and will be a later step. The runtime state is
+  deliberately small and serializable to make that straightforward.
+- The browser observation layer must produce `BrowserWindowState` snapshots; it
+  is the next workstream (plan §5.3).

@@ -1,0 +1,61 @@
+{
+  // BrainRotBlocker rule set. Edit this file to add or change doom-scrolling
+  // surfaces without recompiling the application (ADR-004).
+  //
+  // Durations accept friendly forms: "2m", "1h", "90s", "1h30m", or "hh:mm:ss".
+  // A rule matches when its host matches AND its path matches. Path constraints
+  // (pathPrefixes and pathRegex) combine with OR; omit both to match any path.
+
+  "budgetGroups": [
+    {
+      "id": "short-form-video",
+      "name": "Short-form video",
+      "allowance": "2m",
+      "resetInterval": "1h"
+    },
+    {
+      "id": "feeds",
+      "name": "Algorithmic feeds",
+      "allowance": "2m",
+      "resetInterval": "1h"
+    }
+  ],
+
+  "rules": [
+    {
+      "id": "youtube-shorts",
+      "name": "YouTube Shorts",
+      "host": "youtube.com",
+      "pathPrefixes": ["/shorts"],
+      "budgets": ["short-form-video"]
+    },
+    {
+      "id": "instagram-reels",
+      "name": "Instagram Reels",
+      "host": "instagram.com",
+      "pathPrefixes": ["/reels", "/reel"],
+      "budgets": ["short-form-video"]
+    },
+    {
+      "id": "facebook-reels",
+      "name": "Facebook Reels",
+      "host": "facebook.com",
+      "pathPrefixes": ["/reel"],
+      "budgets": ["short-form-video"]
+    },
+    {
+      "id": "tiktok-feed",
+      "name": "TikTok feed",
+      "host": "tiktok.com",
+      "pathPrefixes": ["/foryou", "/"],
+      "budgets": ["short-form-video"]
+    },
+    {
+      "id": "instagram-home-feed",
+      "name": "Instagram home feed",
+      "host": "instagram.com",
+      "pathRegex": "^/$",
+      "budgets": ["feeds"]
+    }
+  ]
+}
