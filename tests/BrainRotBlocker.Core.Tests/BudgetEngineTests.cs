@@ -6,63 +6,35 @@ namespace BrainRotBlocker.Core.Tests;
 
 public class BudgetEngineTests
 {
+    // Monday, local noon. Hour windows align to the local clock hour.
     private static readonly DateTimeOffset T0 =
-        new(2026, 6, 20, 12, 0, 0, TimeSpan.Zero);
+        new(new DateTime(2026, 6, 22, 12, 0, 0, DateTimeKind.Local));
 
-    // Budgets used by the tests: small allowances so they exhaust quickly, and a
-    // generous accounted-gap cap so a single multi-second tick counts in full.
-    private const string ShortForm = "short-form";
-    private const string Feeds = "feeds";
+    private const string Video = "video";
 
-    private static BudgetEngine Engine(
-        TimeSpan? allowance = null,
-        TimeSpan? reset = null,
-        TimeSpan? cap = null)
+    private static TargetSite Site(string url) => new(url, SiteUrl.ToPattern(url, true));
+
+    private static BudgetEngine Engine(TimeSpan? allowance = null, TimeSpan? cap = null)
     {
-        TimeSpan a = allowance ?? TimeSpan.FromSeconds(10);
-        TimeSpan r = reset ?? TimeSpan.FromMinutes(1);
-
-        var config = new BlockerConfiguration(
-            new[]
-            {
-                new Rule(
-                    "yt-shorts",
-                    "YouTube Shorts",
-                    new UrlPattern("youtube.com", pathPrefixes: new[] { "/shorts" }),
-                    new[] { ShortForm }),
-                new Rule(
-                    "ig-reels",
-                    "Instagram Reels",
-                    new UrlPattern("instagram.com", pathPrefixes: new[] { "/reels" }),
-                    new[] { ShortForm }),
-                new Rule(
-                    "ig-feed",
-                    "Instagram home feed",
-                    new UrlPattern("instagram.com", pathRegex: "^/$"),
-                    new[] { Feeds }),
-            },
-            new[]
-            {
-                new BudgetGroup(ShortForm, ShortForm, a, r),
-                new BudgetGroup(Feeds, Feeds, a, r),
-            });
+        var rule = new Rule(
+            Video, "Short video",
+            new[] { Site("youtube.com/shorts"), Site("instagram.com/reels") },
+            allowance ?? TimeSpan.FromSeconds(10),
+            allDay: true, default, default, null);
 
         return new BudgetEngine(
-            config,
+            new BlockerConfiguration(new[] { rule }),
             new BudgetEngineOptions { MaxAccountedGap = cap ?? TimeSpan.FromMinutes(5) });
     }
 
-    private static BrowserWindowState Win(string id, string? url) =>
-        BrowserWindowState.FromString(id, url);
+    private static BrowserWindowState Win(string id, string? url) => BrowserWindowState.FromString(id, url);
 
     private static IReadOnlyList<BrowserWindowState> Windows(params BrowserWindowState[] w) => w;
 
-    private static TimeSpan Consumed(TickResult result, string budgetId) =>
-        result.Budgets.Single(b => b.BudgetGroupId == budgetId).Consumed;
+    private static TimeSpan Consumed(TickResult r) => r.Rules.Single(x => x.RuleId == Video).Consumed;
 
     private const string Shorts = "https://youtube.com/shorts/abc";
     private const string Reels = "https://instagram.com/reels/xyz";
-    private const string IgFeed = "https://instagram.com/";
     private const string IgDirect = "https://instagram.com/direct/inbox";
 
     [Fact]
@@ -70,107 +42,82 @@ public class BudgetEngineTests
     {
         var engine = Engine();
         TickResult r = engine.Tick(Windows(Win("w1", Shorts)), T0);
-        Assert.Equal(TimeSpan.Zero, Consumed(r, ShortForm));
+        Assert.Equal(TimeSpan.Zero, Consumed(r));
         Assert.Empty(r.CloseDecisions);
     }
 
     [Fact]
-    public void Matching_selected_tab_consumes_its_budget()
+    public void Matching_selected_tab_consumes_allowance()
     {
         var engine = Engine();
         engine.Tick(Windows(Win("w1", Shorts)), T0);
         TickResult r = engine.Tick(Windows(Win("w1", Shorts)), T0 + TimeSpan.FromSeconds(4));
-        Assert.Equal(TimeSpan.FromSeconds(4), Consumed(r, ShortForm));
+        Assert.Equal(TimeSpan.FromSeconds(4), Consumed(r));
     }
 
     [Fact]
-    public void Non_matching_selected_tab_consumes_nothing()
+    public void Non_matching_tab_consumes_nothing()
     {
         var engine = Engine();
         engine.Tick(Windows(Win("w1", IgDirect)), T0);
         TickResult r = engine.Tick(Windows(Win("w1", IgDirect)), T0 + TimeSpan.FromSeconds(4));
-        Assert.Equal(TimeSpan.Zero, Consumed(r, ShortForm));
+        Assert.Equal(TimeSpan.Zero, Consumed(r));
         Assert.Empty(r.CloseDecisions);
     }
 
     [Fact]
-    public void Budget_is_charged_once_across_multiple_matching_windows()
+    public void Rule_is_charged_once_across_multiple_matching_windows()
     {
-        // ADR-005: time is not multiplied by the number of matching windows.
         var engine = Engine();
         engine.Tick(Windows(Win("w1", Shorts), Win("w2", Reels)), T0);
         TickResult r = engine.Tick(
             Windows(Win("w1", Shorts), Win("w2", Reels)),
             T0 + TimeSpan.FromSeconds(6));
-        Assert.Equal(TimeSpan.FromSeconds(6), Consumed(r, ShortForm));
+        Assert.Equal(TimeSpan.FromSeconds(6), Consumed(r));
     }
 
     [Fact]
-    public void Simultaneous_budget_groups_each_consume_the_same_elapsed()
-    {
-        var engine = Engine();
-        engine.Tick(Windows(Win("w1", Shorts), Win("w2", IgFeed)), T0);
-        TickResult r = engine.Tick(
-            Windows(Win("w1", Shorts), Win("w2", IgFeed)),
-            T0 + TimeSpan.FromSeconds(5));
-        Assert.Equal(TimeSpan.FromSeconds(5), Consumed(r, ShortForm));
-        Assert.Equal(TimeSpan.FromSeconds(5), Consumed(r, Feeds));
-    }
-
-    [Fact]
-    public void Exhaustion_closes_the_matching_selected_tab_on_the_crossing_tick()
+    public void Exhaustion_closes_the_matching_tab_on_the_crossing_tick()
     {
         var engine = Engine(allowance: TimeSpan.FromSeconds(10));
         engine.Tick(Windows(Win("w1", Shorts)), T0);
         TickResult r = engine.Tick(Windows(Win("w1", Shorts)), T0 + TimeSpan.FromSeconds(10));
 
-        CloseDecision decision = Assert.Single(r.CloseDecisions);
-        Assert.Equal("w1", decision.WindowId);
-        Assert.Equal(ShortForm, decision.BudgetGroupId);
-        Assert.Equal("yt-shorts", decision.RuleId);
+        CloseDecision d = Assert.Single(r.CloseDecisions);
+        Assert.Equal("w1", d.WindowId);
+        Assert.Equal(Video, d.RuleId);
     }
 
     [Fact]
-    public void Reopened_surface_is_closed_again_before_reset()
+    public void Reopened_surface_is_closed_again_before_the_hour_resets()
     {
-        var engine = Engine(allowance: TimeSpan.FromSeconds(10), reset: TimeSpan.FromHours(1));
+        var engine = Engine(allowance: TimeSpan.FromSeconds(10));
         engine.Tick(Windows(Win("w1", Shorts)), T0);
-        engine.Tick(Windows(Win("w1", Shorts)), T0 + TimeSpan.FromSeconds(10)); // exhaust + close
+        engine.Tick(Windows(Win("w1", Shorts)), T0 + TimeSpan.FromSeconds(10));
 
-        // User reopens shorts 30s later, still within the same budget window.
-        TickResult r = engine.Tick(
-            Windows(Win("w9", Shorts)),
-            T0 + TimeSpan.FromSeconds(40));
+        TickResult r = engine.Tick(Windows(Win("w9", Shorts)), T0 + TimeSpan.FromSeconds(40));
         Assert.Equal("w9", Assert.Single(r.CloseDecisions).WindowId);
     }
 
     [Fact]
-    public void Budget_becomes_available_again_after_window_reset()
+    public void Allowance_refills_at_the_next_clock_hour()
     {
-        var engine = Engine(allowance: TimeSpan.FromSeconds(10), reset: TimeSpan.FromMinutes(1));
+        var engine = Engine(allowance: TimeSpan.FromSeconds(10));
         engine.Tick(Windows(Win("w1", Shorts)), T0);
         engine.Tick(Windows(Win("w1", Shorts)), T0 + TimeSpan.FromSeconds(10)); // exhaust
 
-        // Next budget window (T0 is aligned to the minute, so +1 min is a new window).
-        TickResult r = engine.Tick(
-            Windows(Win("w1", Shorts)),
-            T0 + TimeSpan.FromMinutes(1));
+        TickResult r = engine.Tick(Windows(Win("w1", Shorts)), T0 + TimeSpan.FromHours(1));
         Assert.Empty(r.CloseDecisions);
-        Assert.Equal(TimeSpan.Zero, Consumed(r, ShortForm));
+        Assert.Equal(TimeSpan.Zero, Consumed(r));
     }
 
     [Fact]
-    public void Over_long_gap_is_clamped_so_sleep_does_not_drain_budget()
+    public void Over_long_gap_within_the_hour_is_clamped()
     {
-        var engine = Engine(
-            allowance: TimeSpan.FromSeconds(10),
-            reset: TimeSpan.FromHours(24),
-            cap: TimeSpan.FromSeconds(5));
-
+        var engine = Engine(allowance: TimeSpan.FromSeconds(20), cap: TimeSpan.FromSeconds(5));
         engine.Tick(Windows(Win("w1", Shorts)), T0);
-        // Two-hour gap (machine asleep) but the same budget window.
-        TickResult r = engine.Tick(Windows(Win("w1", Shorts)), T0 + TimeSpan.FromHours(2));
-        Assert.Equal(TimeSpan.FromSeconds(5), Consumed(r, ShortForm));
+        TickResult r = engine.Tick(Windows(Win("w1", Shorts)), T0 + TimeSpan.FromSeconds(30));
+        Assert.Equal(TimeSpan.FromSeconds(5), Consumed(r));
         Assert.Empty(r.CloseDecisions);
     }
 
@@ -179,59 +126,50 @@ public class BudgetEngineTests
     {
         var engine = Engine();
         engine.Tick(Windows(Win("w1", Shorts)), T0);
-        TickResult r = engine.Tick(Windows(Win("w1", Shorts)), T0 - TimeSpan.FromSeconds(30));
-        Assert.Equal(TimeSpan.Zero, Consumed(r, ShortForm));
+        TickResult r = engine.Tick(Windows(Win("w1", Shorts)), T0 - TimeSpan.FromSeconds(5));
+        Assert.Equal(TimeSpan.Zero, Consumed(r));
     }
 
     [Fact]
-    public void Parked_tab_consumes_and_closes_only_once_it_becomes_selected()
+    public void Block_completely_rule_closes_its_sites_while_active()
     {
-        // The model only ever sees the selected tab. While shorts is parked
-        // (selected tab is DMs) nothing is charged; once it becomes selected it
-        // consumes and can be closed.
-        var engine = Engine(allowance: TimeSpan.FromSeconds(10));
-        engine.Tick(Windows(Win("w1", IgDirect)), T0);
-        TickResult parked = engine.Tick(Windows(Win("w1", IgDirect)), T0 + TimeSpan.FromSeconds(10));
-        Assert.Equal(TimeSpan.Zero, Consumed(parked, ShortForm));
+        var rule = new Rule(
+            "bedtime", "Bedtime",
+            new[] { Site("instagram.com") },
+            allowance: null, allDay: true, default, default, null);
+        var engine = new BudgetEngine(new BlockerConfiguration(new[] { rule }));
 
-        engine.Tick(Windows(Win("w1", Shorts)), T0 + TimeSpan.FromSeconds(11));
-        TickResult selected = engine.Tick(Windows(Win("w1", Shorts)), T0 + TimeSpan.FromSeconds(21));
-        Assert.Equal("w1", Assert.Single(selected.CloseDecisions).WindowId);
-    }
-
-    [Fact]
-    public void Window_with_no_url_is_ignored()
-    {
-        var engine = Engine();
-        engine.Tick(Windows(Win("w1", null)), T0);
-        TickResult r = engine.Tick(Windows(Win("w1", null)), T0 + TimeSpan.FromSeconds(5));
-        Assert.Equal(TimeSpan.Zero, Consumed(r, ShortForm));
-        Assert.Empty(r.CloseDecisions);
-    }
-
-    [Fact]
-    public void Shared_budget_is_drained_by_either_surface()
-    {
-        // 6s of shorts then 6s of reels exhaust the shared 10s short-form budget.
-        var engine = Engine(allowance: TimeSpan.FromSeconds(10), reset: TimeSpan.FromHours(1));
-        engine.Tick(Windows(Win("w1", Shorts)), T0);
-        engine.Tick(Windows(Win("w1", Shorts)), T0 + TimeSpan.FromSeconds(6));
-        TickResult r = engine.Tick(Windows(Win("w1", Reels)), T0 + TimeSpan.FromSeconds(12));
+        TickResult r = engine.Tick(Windows(Win("w1", "https://instagram.com/reels/x")), T0);
         Assert.Equal("w1", Assert.Single(r.CloseDecisions).WindowId);
+        Assert.True(r.Rules.Single().IsBlocking);
     }
 
     [Fact]
-    public void Snapshot_reports_remaining_and_window_bounds()
+    public void Rule_outside_its_window_does_not_block_or_charge()
     {
-        var engine = Engine(allowance: TimeSpan.FromSeconds(10), reset: TimeSpan.FromMinutes(1));
+        // Active 23:00-07:00; at noon it is inactive.
+        var rule = new Rule(
+            "bedtime", "Bedtime",
+            new[] { Site("instagram.com/reels") },
+            allowance: null, allDay: false, new TimeOnly(23, 0), new TimeOnly(7, 0), null);
+        var engine = new BudgetEngine(new BlockerConfiguration(new[] { rule }));
+
+        TickResult r = engine.Tick(Windows(Win("w1", Reels)), T0);
+        Assert.Empty(r.CloseDecisions);
+        Assert.False(r.Rules.Single().IsActive);
+    }
+
+    [Fact]
+    public void Snapshot_reports_remaining_for_an_allowance_rule()
+    {
+        var engine = Engine(allowance: TimeSpan.FromSeconds(10));
         engine.Tick(Windows(Win("w1", Shorts)), T0);
         TickResult r = engine.Tick(Windows(Win("w1", Shorts)), T0 + TimeSpan.FromSeconds(4));
 
-        BudgetSnapshot snap = r.Budgets.Single(b => b.BudgetGroupId == ShortForm);
-        Assert.Equal(TimeSpan.FromSeconds(6), snap.Remaining);
-        Assert.False(snap.IsExhausted);
-        Assert.True(snap.WasActiveThisTick);
-        Assert.Equal(T0, snap.WindowStart);
-        Assert.Equal(T0 + TimeSpan.FromMinutes(1), snap.WindowEnd);
+        RuleSnapshot s = r.Rules.Single();
+        Assert.Equal(TimeSpan.FromSeconds(6), s.Remaining);
+        Assert.False(s.IsBlocking);
+        Assert.True(s.IsActive);
+        Assert.True(s.WasActiveThisTick);
     }
 }

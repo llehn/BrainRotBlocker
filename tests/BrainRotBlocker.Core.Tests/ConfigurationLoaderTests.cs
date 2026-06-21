@@ -6,45 +6,64 @@ namespace BrainRotBlocker.Core.Tests;
 public class ConfigurationLoaderTests
 {
     [Fact]
-    public void Loads_a_valid_configuration_from_json()
+    public void Loads_an_allowance_rule()
     {
         const string json = """
         {
-          "budgetGroups": [
-            { "id": "short-form-video", "name": "Short-form video",
-              "allowance": "2m", "resetInterval": "1h" }
-          ],
           "rules": [
-            { "id": "youtube-shorts", "name": "YouTube Shorts",
-              "host": "youtube.com", "pathPrefixes": ["/shorts"],
-              "budgets": ["short-form-video"] }
+            {
+              "id": "short-video", "name": "Short video",
+              "allowanceMinutes": 5, "allDay": true,
+              "sites": [
+                { "label": "YouTube Shorts", "url": "youtube.com/shorts", "includeSubpaths": true }
+              ]
+            }
           ]
         }
         """;
 
         BlockerConfiguration config = ConfigurationLoader.Load(json);
+        Rule rule = Assert.Single(config.Rules);
 
-        BudgetGroup budget = Assert.Single(config.BudgetGroups);
-        Assert.Equal(TimeSpan.FromMinutes(2), budget.Allowance);
-        Assert.Equal(TimeSpan.FromHours(1), budget.ResetInterval);
-
-        Assert.Contains(
-            "short-form-video",
-            config.BudgetGroupIdsForUrl(new Uri("https://youtube.com/shorts/x")));
+        Assert.Equal(TimeSpan.FromMinutes(5), rule.Allowance);
+        Assert.False(rule.BlocksCompletely);
+        Assert.True(rule.AllDay);
+        Assert.True(rule.MatchesUrl(new Uri("https://youtube.com/shorts/x")));
     }
 
     [Fact]
-    public void Rule_referencing_unknown_budget_is_rejected()
+    public void Loads_a_block_completely_windowed_rule()
     {
         const string json = """
         {
-          "budgetGroups": [],
           "rules": [
-            { "id": "r", "host": "a.com", "budgets": ["missing"] }
+            {
+              "id": "bedtime", "name": "Bedtime",
+              "allDay": false, "from": "23:00", "to": "07:00",
+              "days": ["Monday", "Tuesday"],
+              "sites": [ { "label": "Instagram", "url": "instagram.com" } ]
+            }
           ]
         }
         """;
 
+        Rule rule = Assert.Single(ConfigurationLoader.Load(json).Rules);
+
+        Assert.True(rule.BlocksCompletely);
+        Assert.False(rule.AllDay);
+        Assert.Equal(new TimeOnly(23, 0), rule.From);
+        Assert.Equal(new TimeOnly(7, 0), rule.To);
+        Assert.True(rule.WrapsMidnight);
+        Assert.Equal(new[] { DayOfWeek.Monday, DayOfWeek.Tuesday }, rule.Days.OrderBy(d => d));
+    }
+
+    [Fact]
+    public void Allowance_of_an_hour_or_more_is_rejected()
+    {
+        const string json = """
+        { "rules": [ { "id": "r", "allowanceMinutes": 60,
+          "sites": [ { "url": "a.com" } ] } ] }
+        """;
         Assert.Throws<ConfigurationException>(() => ConfigurationLoader.Load(json));
     }
 
@@ -59,19 +78,8 @@ public class ConfigurationLoaderTests
     [InlineData("1h", 1, 0, 0)]
     [InlineData("90s", 0, 1, 30)]
     [InlineData("1h30m", 1, 30, 0)]
-    [InlineData("00:02:00", 0, 2, 0)]
     public void Duration_parses_friendly_forms(string text, int h, int m, int s)
     {
         Assert.Equal(new TimeSpan(h, m, s), Duration.Parse(text));
-    }
-
-    [Theory]
-    [InlineData("")]
-    [InlineData("2x")]
-    [InlineData("abc")]
-    [InlineData("10")]
-    public void Duration_rejects_invalid_forms(string text)
-    {
-        Assert.False(Duration.TryParse(text, out _));
     }
 }

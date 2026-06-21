@@ -1,67 +1,77 @@
 namespace BrainRotBlocker.Core.Accounting;
 
 /// <summary>
-/// The decision to close one browser window's selected tab because the surface
-/// it shows belongs to an exhausted budget.
+/// The decision to close one browser window's selected tab because the site it
+/// shows is blocked by a rule.
 /// </summary>
 public sealed class CloseDecision
 {
-    public CloseDecision(string windowId, Uri url, string ruleId, string budgetGroupId)
+    public CloseDecision(string windowId, Uri url, string ruleId)
     {
         WindowId = windowId;
         Url = url;
         RuleId = ruleId;
-        BudgetGroupId = budgetGroupId;
     }
 
     public string WindowId { get; }
 
     public Uri Url { get; }
 
-    /// <summary>The matching rule that identified the surface.</summary>
+    /// <summary>The rule that triggered the close.</summary>
     public string RuleId { get; }
-
-    /// <summary>The exhausted budget group that triggered the close.</summary>
-    public string BudgetGroupId { get; }
 }
 
-/// <summary>Inspectable state of one budget group at a point in time.</summary>
-public sealed class BudgetSnapshot
+/// <summary>Inspectable state of one rule at a point in time, for display.</summary>
+public sealed class RuleSnapshot
 {
-    public BudgetSnapshot(
-        string budgetGroupId,
-        TimeSpan consumed,
+    public RuleSnapshot(
+        string ruleId,
+        string name,
+        bool isActive,
+        bool blocksCompletely,
+        bool isBlocking,
         TimeSpan allowance,
-        DateTimeOffset windowStart,
-        DateTimeOffset windowEnd,
+        TimeSpan consumed,
+        DateTimeOffset? hourResetsAt,
+        DateTimeOffset? activeWindowEndsAt,
         bool wasActiveThisTick)
     {
-        BudgetGroupId = budgetGroupId;
-        Consumed = consumed;
+        RuleId = ruleId;
+        Name = name;
+        IsActive = isActive;
+        BlocksCompletely = blocksCompletely;
+        IsBlocking = isBlocking;
         Allowance = allowance;
-        WindowStart = windowStart;
-        WindowEnd = windowEnd;
+        Consumed = consumed;
+        HourResetsAt = hourResetsAt;
+        ActiveWindowEndsAt = activeWindowEndsAt;
         WasActiveThisTick = wasActiveThisTick;
     }
 
-    public string BudgetGroupId { get; }
+    public string RuleId { get; }
 
-    public TimeSpan Consumed { get; }
+    public string Name { get; }
+
+    /// <summary>True if the rule is in effect right now (window + days).</summary>
+    public bool IsActive { get; }
+
+    public bool BlocksCompletely { get; }
+
+    /// <summary>True if the rule's sites are blocked right now.</summary>
+    public bool IsBlocking { get; }
 
     public TimeSpan Allowance { get; }
 
-    public TimeSpan Remaining =>
-        Consumed >= Allowance ? TimeSpan.Zero : Allowance - Consumed;
+    public TimeSpan Consumed { get; }
 
-    public bool IsExhausted => Consumed >= Allowance;
+    public TimeSpan Remaining => Consumed >= Allowance ? TimeSpan.Zero : Allowance - Consumed;
 
-    /// <summary>Start of the current tumbling budget window.</summary>
-    public DateTimeOffset WindowStart { get; }
+    /// <summary>When the hourly allowance next refills (allowance rules only).</summary>
+    public DateTimeOffset? HourResetsAt { get; }
 
-    /// <summary>End of the current window; the budget resets at this instant.</summary>
-    public DateTimeOffset WindowEnd { get; }
+    /// <summary>When the current active window ends (time-bounded rules only).</summary>
+    public DateTimeOffset? ActiveWindowEndsAt { get; }
 
-    /// <summary>True if a matching surface consumed this budget on the last tick.</summary>
     public bool WasActiveThisTick { get; }
 }
 
@@ -70,23 +80,17 @@ public sealed class TickResult
 {
     public TickResult(
         IReadOnlyList<CloseDecision> closeDecisions,
-        IReadOnlyList<BudgetSnapshot> budgets)
+        IReadOnlyList<RuleSnapshot> rules)
     {
         CloseDecisions = closeDecisions;
-        Budgets = budgets;
+        Rules = rules;
     }
 
-    /// <summary>
-    /// The selected tabs to close this tick. At most one decision per window; a
-    /// window selected for closing because of several exhausted budgets is
-    /// reported once.
-    /// </summary>
+    /// <summary>The selected tabs to close this tick. At most one per window.</summary>
     public IReadOnlyList<CloseDecision> CloseDecisions { get; }
 
-    /// <summary>Distinct window ids whose selected tab should be closed.</summary>
-    public IEnumerable<string> WindowIdsToClose =>
-        CloseDecisions.Select(d => d.WindowId);
+    public IEnumerable<string> WindowIdsToClose => CloseDecisions.Select(d => d.WindowId);
 
-    /// <summary>State of every budget group after this tick, for display and tests.</summary>
-    public IReadOnlyList<BudgetSnapshot> Budgets { get; }
+    /// <summary>State of every rule after this tick, for display and tests.</summary>
+    public IReadOnlyList<RuleSnapshot> Rules { get; }
 }

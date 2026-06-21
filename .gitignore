@@ -25,3 +25,7 @@ target/
 # Local enforcement / runtime state (never commit budget state or secrets)
 *.local.json
 local-state/
+
+# Published single-file distributable and scratch screenshots
+publish/
+.brb-*

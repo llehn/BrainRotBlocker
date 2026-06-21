@@ -4,75 +4,61 @@ namespace BrainRotBlocker.Core.Accounting;
 
 /// <summary>
 /// The deterministic core of the product: given the selected tab of every open
-/// browser window and the current time, it accounts time against the configured
-/// budgets and decides which selected tabs must be closed.
+/// browser window and the current time, it decides which selected tabs must be
+/// closed because a rule blocks the site they show.
 ///
 /// The engine owns no clock and touches no OS resources. The caller supplies the
 /// browser snapshot and the current instant on every <see cref="Tick"/>, which
 /// makes the whole model reproducible and unit-testable.
 ///
-/// Accounting rules (ADR-005):
+/// Per rule:
 /// <list type="bullet">
-///   <item>Only the selected tab / current page of each window is considered.</item>
-///   <item>Each affected budget is charged the elapsed interval exactly once per
-///   tick, never multiplied by the number of matching windows.</item>
+///   <item>A rule only counts and blocks while it is active (its day-of-week and
+///   time window).</item>
+///   <item>A <em>block-completely</em> rule blocks its sites whenever it is
+///   active.</item>
+///   <item>An <em>allowance</em> rule charges elapsed time (once per tick, never
+///   multiplied by matching windows) against a budget that refills each clock
+///   hour, and blocks once the hour's allowance is spent.</item>
 ///   <item>An over-long gap between ticks is clamped (see
-///   <see cref="BudgetEngineOptions.MaxAccountedGap"/>) so sleep/lock effectively
-///   pause accounting.</item>
+///   <see cref="BudgetEngineOptions.MaxAccountedGap"/>) so sleep/lock pauses
+///   accounting.</item>
 /// </list>
-///
-/// Closing rules (ADR-004): a window's selected tab is closed when it matches a
-/// rule assigned to any exhausted budget. The order within a tick is: reset
-/// windows that rolled over, charge elapsed time, then evaluate exhaustion, so
-/// the very tick that exhausts a budget also closes the surface that drained it.
 /// </summary>
 public sealed class BudgetEngine
 {
     private readonly BlockerConfiguration _configuration;
     private readonly BudgetEngineOptions _options;
-    private readonly Dictionary<string, BudgetRuntimeState> _states;
+    private readonly Dictionary<string, RuleRuntime> _states;
     private DateTimeOffset? _lastTick;
 
-    public BudgetEngine(
-        BlockerConfiguration configuration,
-        BudgetEngineOptions? options = null)
+    public BudgetEngine(BlockerConfiguration configuration, BudgetEngineOptions? options = null)
     {
         _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
         _options = options ?? new BudgetEngineOptions();
-        _states = new Dictionary<string, BudgetRuntimeState>(StringComparer.Ordinal);
-        foreach (BudgetGroup group in _configuration.BudgetGroups)
+        _states = new Dictionary<string, RuleRuntime>(StringComparer.Ordinal);
+        foreach (Rule rule in _configuration.Rules)
         {
-            _states[group.Id] = new BudgetRuntimeState(group);
+            _states[rule.Id] = new RuleRuntime(rule);
         }
     }
 
-    /// <summary>
-    /// Advances accounting to <paramref name="now"/> for the given browser
-    /// windows and returns the close decisions plus the post-tick budget state.
-    ///
-    /// The first call after construction only establishes the time baseline (it
-    /// charges no time) but still evaluates blocking against any state restored
-    /// from persistence.
-    /// </summary>
     public TickResult Tick(IReadOnlyList<BrowserWindowState> windows, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(windows);
-        now = now.ToUniversalTime();
 
         TimeSpan elapsed = ComputeElapsed(now);
         _lastTick = now;
 
-        // Roll every budget over to the window that contains `now` before we
-        // charge time, so a brand-new window starts from a clean allowance.
-        foreach (BudgetRuntimeState state in _states.Values)
+        foreach (RuleRuntime state in _states.Values)
         {
-            state.RollTo(now);
+            state.Roll(now);
         }
 
-        // Determine which budgets are consumed this tick: the union over all
-        // windows of the budgets each selected URL maps to. Using a set means a
-        // budget is charged once even when several windows show a matching page.
-        var affectedBudgets = new HashSet<string>(StringComparer.Ordinal);
+        // Which allowance rules are being consumed this tick: matched by a
+        // selected tab and currently active. A rule is charged once even when
+        // several windows show a matching page.
+        var affected = new HashSet<string>(StringComparer.Ordinal);
         foreach (BrowserWindowState window in windows)
         {
             if (window.Url is null)
@@ -80,22 +66,23 @@ public sealed class BudgetEngine
                 continue;
             }
 
-            foreach (string budgetId in _configuration.BudgetGroupIdsForUrl(window.Url))
+            foreach (Rule rule in _configuration.MatchingRules(window.Url))
             {
-                affectedBudgets.Add(budgetId);
+                if (!rule.BlocksCompletely && rule.IsActiveAt(now))
+                {
+                    affected.Add(rule.Id);
+                }
             }
         }
 
         if (elapsed > TimeSpan.Zero)
         {
-            foreach (string budgetId in affectedBudgets)
+            foreach (string ruleId in affected)
             {
-                _states[budgetId].Charge(elapsed, now);
+                _states[ruleId].Charge(elapsed, now);
             }
         }
 
-        // Decide closures: a window is closed when its selected page matches a
-        // rule assigned to an exhausted budget. One decision per window.
         var decisions = new List<CloseDecision>();
         foreach (BrowserWindowState window in windows)
         {
@@ -104,35 +91,22 @@ public sealed class BudgetEngine
                 continue;
             }
 
-            CloseDecision? decision = EvaluateClose(window);
-            if (decision is not null)
+            foreach (Rule rule in _configuration.MatchingRules(window.Url))
             {
-                decisions.Add(decision);
-            }
-        }
-
-        return new TickResult(decisions, BuildSnapshots(affectedBudgets));
-    }
-
-    /// <summary>Current state of every budget without advancing time.</summary>
-    public IReadOnlyList<BudgetSnapshot> GetBudgetSnapshots()
-        => BuildSnapshots(activeBudgets: null);
-
-    private CloseDecision? EvaluateClose(BrowserWindowState window)
-    {
-        foreach (Rule rule in _configuration.MatchingRules(window.Url!))
-        {
-            foreach (string budgetId in rule.BudgetGroupIds)
-            {
-                if (_states[budgetId].IsExhausted)
+                if (_states[rule.Id].IsBlocking(now))
                 {
-                    return new CloseDecision(window.WindowId, window.Url!, rule.Id, budgetId);
+                    decisions.Add(new CloseDecision(window.WindowId, window.Url, rule.Id));
+                    break;
                 }
             }
         }
 
-        return null;
+        return new TickResult(decisions, BuildSnapshots(now, affected));
     }
+
+    /// <summary>Current state of every rule without advancing time.</summary>
+    public IReadOnlyList<RuleSnapshot> GetRuleSnapshots(DateTimeOffset now)
+        => BuildSnapshots(now, activeRules: null);
 
     private TimeSpan ComputeElapsed(DateTimeOffset now)
     {
@@ -144,62 +118,75 @@ public sealed class BudgetEngine
         TimeSpan raw = now - last;
         if (raw <= TimeSpan.Zero)
         {
-            // Clock did not advance (or went backwards). Charge nothing.
             return TimeSpan.Zero;
         }
 
         return raw > _options.MaxAccountedGap ? _options.MaxAccountedGap : raw;
     }
 
-    private IReadOnlyList<BudgetSnapshot> BuildSnapshots(ISet<string>? activeBudgets)
+    private IReadOnlyList<RuleSnapshot> BuildSnapshots(DateTimeOffset now, ISet<string>? activeRules)
     {
-        var snapshots = new List<BudgetSnapshot>(_states.Count);
-        foreach (BudgetRuntimeState state in _states.Values)
+        var snapshots = new List<RuleSnapshot>(_states.Count);
+        foreach (Rule rule in _configuration.Rules)
         {
-            snapshots.Add(state.ToSnapshot(
-                activeBudgets?.Contains(state.Group.Id) ?? false));
+            snapshots.Add(_states[rule.Id].ToSnapshot(
+                now,
+                activeRules?.Contains(rule.Id) ?? false));
         }
 
         return snapshots;
     }
 
-    /// <summary>Mutable per-budget runtime state: current window and time used.</summary>
-    private sealed class BudgetRuntimeState
+    /// <summary>Mutable per-rule runtime: the current hour's allowance usage.</summary>
+    private sealed class RuleRuntime
     {
-        private DateTimeOffset _windowStart;
+        private readonly Rule _rule;
+        private DateTimeOffset _hourStart;
         private TimeSpan _consumed;
 
-        public BudgetRuntimeState(BudgetGroup group)
+        public RuleRuntime(Rule rule)
         {
-            Group = group;
-            _windowStart = group.WindowStartFor(group.Anchor);
-            _consumed = TimeSpan.Zero;
+            _rule = rule;
+            _hourStart = rule.HourWindowStart(DateTimeOffset.UnixEpoch);
         }
 
-        public BudgetGroup Group { get; }
-
-        public bool IsExhausted => _consumed >= Group.Allowance;
-
-        public void RollTo(DateTimeOffset now)
+        public bool IsBlocking(DateTimeOffset now)
         {
-            DateTimeOffset windowStart = Group.WindowStartFor(now);
-            if (windowStart != _windowStart)
+            if (!_rule.IsActiveAt(now))
             {
-                _windowStart = windowStart;
+                return false;
+            }
+
+            return _rule.BlocksCompletely || _consumed >= _rule.Allowance!.Value;
+        }
+
+        public void Roll(DateTimeOffset now)
+        {
+            if (_rule.BlocksCompletely)
+            {
+                return;
+            }
+
+            DateTimeOffset hourStart = _rule.HourWindowStart(now);
+            if (hourStart != _hourStart)
+            {
+                _hourStart = hourStart;
                 _consumed = TimeSpan.Zero;
             }
         }
 
         public void Charge(TimeSpan elapsed, DateTimeOffset now)
         {
-            // Only the portion of the elapsed gap that falls inside the current
-            // window may be charged to it. When a tick spans a window boundary,
-            // the time before the boundary belonged to the (now reset) previous
-            // window and must not over-charge the fresh allowance.
-            TimeSpan withinWindow = now - _windowStart;
-            if (elapsed > withinWindow)
+            if (_rule.BlocksCompletely)
             {
-                elapsed = withinWindow;
+                return;
+            }
+
+            // Only the part of the gap inside the current hour may be charged.
+            TimeSpan withinHour = now - _hourStart;
+            if (elapsed > withinHour)
+            {
+                elapsed = withinHour;
             }
 
             if (elapsed <= TimeSpan.Zero)
@@ -208,20 +195,26 @@ public sealed class BudgetEngine
             }
 
             _consumed += elapsed;
-            if (_consumed > Group.Allowance)
+            if (_consumed > _rule.Allowance!.Value)
             {
-                // Cap so the consumed value stays tidy; exhaustion is sticky
-                // until the window resets regardless.
-                _consumed = Group.Allowance;
+                _consumed = _rule.Allowance.Value;
             }
         }
 
-        public BudgetSnapshot ToSnapshot(bool wasActiveThisTick) => new(
-            Group.Id,
-            _consumed,
-            Group.Allowance,
-            _windowStart,
-            _windowStart + Group.ResetInterval,
-            wasActiveThisTick);
+        public RuleSnapshot ToSnapshot(DateTimeOffset now, bool wasActiveThisTick)
+        {
+            bool active = _rule.IsActiveAt(now);
+            return new RuleSnapshot(
+                _rule.Id,
+                _rule.Name,
+                active,
+                _rule.BlocksCompletely,
+                IsBlocking(now),
+                _rule.Allowance ?? TimeSpan.Zero,
+                _rule.BlocksCompletely ? TimeSpan.Zero : _consumed,
+                _rule.BlocksCompletely ? null : _hourStart + Rule.AllowancePeriod,
+                _rule.ActiveWindowEndsAt(now),
+                wasActiveThisTick);
+        }
     }
 }

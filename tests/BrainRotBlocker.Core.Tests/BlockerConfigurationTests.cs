@@ -5,74 +5,49 @@ namespace BrainRotBlocker.Core.Tests;
 
 public class BlockerConfigurationTests
 {
-    private static BudgetGroup Budget(string id) =>
-        new(id, id, TimeSpan.FromMinutes(2), TimeSpan.FromHours(1));
-
-    private static Rule Rule(string id, UrlPattern p, params string[] budgets) =>
-        new(id, id, p, budgets);
-
-    [Fact]
-    public void Rule_referencing_unknown_budget_is_rejected()
-    {
-        Assert.Throws<ConfigurationException>(() => new BlockerConfiguration(
-            new[] { Rule("r", new UrlPattern("a.com"), "missing") },
-            new[] { Budget("present") }));
-    }
-
-    [Fact]
-    public void Duplicate_budget_ids_are_rejected()
-    {
-        Assert.Throws<ConfigurationException>(() => new BlockerConfiguration(
-            Array.Empty<Rule>(),
-            new[] { Budget("dup"), Budget("dup") }));
-    }
+    private static Rule Rule(string id, string url) => new(
+        id, id,
+        new[] { new TargetSite(url, SiteUrl.ToPattern(url, includeSubpaths: true)) },
+        TimeSpan.FromMinutes(5), allDay: true, default, default, null);
 
     [Fact]
     public void Duplicate_rule_ids_are_rejected()
     {
         Assert.Throws<ConfigurationException>(() => new BlockerConfiguration(
-            new[]
-            {
-                Rule("dup", new UrlPattern("a.com"), "b"),
-                Rule("dup", new UrlPattern("c.com"), "b"),
-            },
-            new[] { Budget("b") }));
+            new[] { Rule("dup", "a.com"), Rule("dup", "b.com") }));
     }
 
     [Fact]
-    public void BudgetGroupIdsForUrl_unions_budgets_of_all_matching_rules()
+    public void Matching_rules_returns_every_rule_that_blocks_the_url()
     {
-        var config = new BlockerConfiguration(
-            new[]
-            {
-                Rule("reels", new UrlPattern("instagram.com", pathPrefixes: new[] { "/reels" }), "short-form"),
-                // A second rule that also matches /reels and adds another budget.
-                Rule("ig-any", new UrlPattern("instagram.com"), "all-instagram"),
-            },
-            new[] { Budget("short-form"), Budget("all-instagram") });
+        var config = new BlockerConfiguration(new[]
+        {
+            Rule("reels", "instagram.com/reels"),
+            Rule("all-ig", "instagram.com"),
+        });
 
-        ISet<string> budgets = config.BudgetGroupIdsForUrl(new Uri("https://instagram.com/reels/x"));
-        Assert.Equal(new[] { "all-instagram", "short-form" }, budgets.OrderBy(x => x));
+        string[] matched = config.MatchingRules(new Uri("https://instagram.com/reels/x"))
+            .Select(r => r.Id)
+            .OrderBy(x => x)
+            .ToArray();
+
+        Assert.Equal(new[] { "all-ig", "reels" }, matched);
     }
 
     [Fact]
-    public void Default_configuration_is_valid_and_matches_known_surfaces()
+    public void Default_configuration_matches_known_surfaces_and_leaves_others_alone()
     {
         BlockerConfiguration config = DefaultConfiguration.Create();
 
-        Assert.Contains(
-            DefaultConfiguration.ShortFormVideoBudgetId,
-            config.BudgetGroupIdsForUrl(new Uri("https://www.youtube.com/shorts/x")));
-        Assert.Contains(
-            DefaultConfiguration.ShortFormVideoBudgetId,
-            config.BudgetGroupIdsForUrl(new Uri("https://instagram.com/reels/x")));
-        Assert.Contains(
-            DefaultConfiguration.FeedsBudgetId,
-            config.BudgetGroupIdsForUrl(new Uri("https://instagram.com/")));
+        Assert.Contains(config.MatchingRules(new Uri("https://www.youtube.com/shorts/x")),
+            r => r.Id == DefaultConfiguration.ShortVideoRuleId);
+        Assert.Contains(config.MatchingRules(new Uri("https://instagram.com/reels/x")),
+            r => r.Id == DefaultConfiguration.ShortVideoRuleId);
+        Assert.Contains(config.MatchingRules(new Uri("https://instagram.com/")),
+            r => r.Id == DefaultConfiguration.FeedsRuleId);
 
-        // Instagram DMs must remain unaffected.
-        Assert.Empty(config.BudgetGroupIdsForUrl(new Uri("https://instagram.com/direct/inbox")));
-        // A normal YouTube watch page must remain unaffected.
-        Assert.Empty(config.BudgetGroupIdsForUrl(new Uri("https://www.youtube.com/watch?v=x")));
+        // Instagram DMs and normal YouTube must remain unaffected.
+        Assert.Empty(config.MatchingRules(new Uri("https://instagram.com/direct/inbox")));
+        Assert.Empty(config.MatchingRules(new Uri("https://www.youtube.com/watch?v=x")));
     }
 }

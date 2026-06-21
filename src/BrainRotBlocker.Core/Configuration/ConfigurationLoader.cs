@@ -5,19 +5,24 @@ namespace BrainRotBlocker.Core.Configuration;
 
 /// <summary>
 /// Loads a <see cref="BlockerConfiguration"/> from JSON so the rule set can be
-/// changed without recompiling the application (ADR-004).
+/// changed without recompiling the application.
 ///
 /// Example:
 /// <code>
 /// {
-///   "budgetGroups": [
-///     { "id": "short-form-video", "name": "Short-form video",
-///       "allowance": "2m", "resetInterval": "1h" }
-///   ],
 ///   "rules": [
-///     { "id": "youtube-shorts", "name": "YouTube Shorts",
-///       "host": "youtube.com", "pathPrefixes": ["/shorts"],
-///       "budgets": ["short-form-video"] }
+///     {
+///       "id": "short-video",
+///       "name": "Short video",
+///       "allowanceMinutes": 5,        // omit to block completely
+///       "allDay": true,               // or false with "from"/"to"
+///       "from": "23:00", "to": "07:00",
+///       "days": ["Monday", "Tuesday"],// omit for every day
+///       "sites": [
+///         { "label": "Instagram Reels", "url": "instagram.com/reels",
+///           "includeSubpaths": true }
+///       ]
+///     }
 ///   ]
 /// }
 /// </code>
@@ -53,7 +58,13 @@ public static class ConfigurationLoader
             throw new ConfigurationException("Configuration JSON deserialized to null.");
         }
 
-        return Map(dto);
+        var rules = new List<Rule>();
+        foreach (RuleDto rule in dto.Rules ?? new())
+        {
+            rules.Add(MapRule(rule));
+        }
+
+        return new BlockerConfiguration(rules);
     }
 
     public static BlockerConfiguration LoadFile(string path)
@@ -66,97 +77,107 @@ public static class ConfigurationLoader
         return Load(File.ReadAllText(path));
     }
 
-    private static BlockerConfiguration Map(ConfigurationDto dto)
+    private static Rule MapRule(RuleDto dto)
     {
-        var budgets = new List<BudgetGroup>();
-        foreach (BudgetGroupDto group in dto.BudgetGroups ?? new())
+        if (string.IsNullOrWhiteSpace(dto.Id))
         {
-            if (string.IsNullOrWhiteSpace(group.Id))
-            {
-                throw new ConfigurationException("A budget group is missing its 'id'.");
-            }
-
-            budgets.Add(new BudgetGroup(
-                group.Id,
-                group.Name ?? group.Id,
-                Duration.Parse(RequireDuration(group.Allowance, group.Id, "allowance")),
-                Duration.Parse(RequireDuration(group.ResetInterval, group.Id, "resetInterval")),
-                ParseAnchor(group.Anchor, group.Id)));
+            throw new ConfigurationException("A rule is missing its 'id'.");
         }
 
-        var rules = new List<Rule>();
-        foreach (RuleDto rule in dto.Rules ?? new())
+        var sites = new List<TargetSite>();
+        foreach (SiteDto site in dto.Sites ?? new())
         {
-            if (string.IsNullOrWhiteSpace(rule.Id))
+            if (string.IsNullOrWhiteSpace(site.Url))
             {
-                throw new ConfigurationException("A rule is missing its 'id'.");
+                throw new ConfigurationException($"Rule '{dto.Id}' has a site with no 'url'.");
             }
 
-            var pattern = new UrlPattern(rule.Host, rule.PathPrefixes, rule.PathRegex);
-            rules.Add(new Rule(
-                rule.Id,
-                rule.Name ?? rule.Id,
-                pattern,
-                rule.Budgets ?? new List<string>()));
+            UrlPattern pattern = SiteUrl.ToPattern(site.Url, site.IncludeSubpaths ?? true);
+            sites.Add(new TargetSite(site.Label ?? site.Url, pattern));
         }
 
-        return new BlockerConfiguration(rules, budgets);
+        TimeSpan? allowance = dto.AllowanceMinutes is { } minutes
+            ? TimeSpan.FromMinutes(minutes)
+            : null;
+
+        bool allDay = dto.AllDay ?? (dto.From is null && dto.To is null);
+
+        return new Rule(
+            dto.Id,
+            dto.Name ?? dto.Id,
+            sites,
+            allowance,
+            allDay,
+            ParseTime(dto.From, dto.Id, "from"),
+            ParseTime(dto.To, dto.Id, "to"),
+            ParseDays(dto.Days, dto.Id));
     }
 
-    private static string RequireDuration(string? value, string id, string field)
+    private static TimeOnly ParseTime(string? value, string id, string field)
     {
         if (string.IsNullOrWhiteSpace(value))
         {
-            throw new ConfigurationException($"Budget group '{id}' is missing '{field}'.");
+            return new TimeOnly(0, 0);
         }
 
-        return value;
-    }
-
-    private static DateTimeOffset? ParseAnchor(string? anchor, string id)
-    {
-        if (string.IsNullOrWhiteSpace(anchor))
-        {
-            return null;
-        }
-
-        if (DateTimeOffset.TryParse(
-                anchor,
+        if (TimeOnly.TryParse(
+                value,
                 System.Globalization.CultureInfo.InvariantCulture,
-                System.Globalization.DateTimeStyles.AssumeUniversal,
-                out DateTimeOffset parsed))
+                System.Globalization.DateTimeStyles.None,
+                out TimeOnly parsed))
         {
             return parsed;
         }
 
-        throw new ConfigurationException($"Budget group '{id}' has an invalid 'anchor': {anchor}");
+        throw new ConfigurationException(
+            $"Rule '{id}' has an invalid '{field}' time '{value}'. Use a form like '23:00'.");
+    }
+
+    private static IReadOnlyCollection<DayOfWeek>? ParseDays(List<string>? days, string id)
+    {
+        if (days is not { Count: > 0 })
+        {
+            return null;
+        }
+
+        var result = new List<DayOfWeek>();
+        foreach (string day in days)
+        {
+            if (Enum.TryParse(day, ignoreCase: true, out DayOfWeek parsed))
+            {
+                result.Add(parsed);
+            }
+            else
+            {
+                throw new ConfigurationException($"Rule '{id}' has an invalid day '{day}'.");
+            }
+        }
+
+        return result;
     }
 
     private sealed class ConfigurationDto
     {
-        [JsonPropertyName("budgetGroups")]
-        public List<BudgetGroupDto>? BudgetGroups { get; set; }
-
         [JsonPropertyName("rules")]
         public List<RuleDto>? Rules { get; set; }
-    }
-
-    private sealed class BudgetGroupDto
-    {
-        public string? Id { get; set; }
-        public string? Name { get; set; }
-        public string? Allowance { get; set; }
-        public string? ResetInterval { get; set; }
-        public string? Anchor { get; set; }
     }
 
     private sealed class RuleDto
     {
         public string? Id { get; set; }
         public string? Name { get; set; }
-        public string? Host { get; set; }
-        public List<string>? PathPrefixes { get; set; }
-        public string? PathRegex { get; set; }
-        public List<string>? Budgets { get; set; }
+        public int? AllowanceMinutes { get; set; }
+        public bool? AllDay { get; set; }
+        public string? From { get; set; }
+        public string? To { get; set; }
+        public List<string>? Days { get; set; }
+        public List<SiteDto>? Sites { get; set; }
+    }
+
+    private sealed class SiteDto
+    {
+        public string? Label { get; set; }
+        public string? Url { get; set; }
+        public bool? IncludeSubpaths { get; set; }
     }
 }

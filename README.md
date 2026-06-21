@@ -10,10 +10,44 @@ production roadmap.
 ## Status
 
 The browser-independent **core product model** is implemented and tested
-(`src/BrainRotBlocker.Core`): configurable URL rules, recurring budget groups
-with N-to-M rule assignment, selected-tab-per-window time accounting, and the
-exhausted-budget tab-closing decision (plan §5.2, ADR-004/005/006). The browser
-observation layer (plan §5.3) is the next workstream.
+(`src/BrainRotBlocker.Core`). It is organized around the user's mental model
+(ADR-007, modelled on AppBlock's "Zeitpläne"): a **rule** is *what* to block plus
+*when*. Each rule combines:
+
+- **What:** a list of sites — a friendly label plus the URL the user types
+  (`instagram.com/reels`). The URL is compiled into the host/path matcher
+  automatically; an "include subpaths" toggle decides whether pages beneath the
+  address also match. The same site may appear in several rules.
+- **When:** a single combined condition —
+  - an **allowance** of *N minutes per hour*, or **block completely** (no
+    allowance);
+  - active **all day** or within a **from–to** window (which may wrap past
+    midnight);
+  - on selected **days of the week**.
+
+A rule blocks its sites whenever it is active and either set to block completely
+or out of allowance for the current hour. Several rules may target the same site;
+the site is blocked if any active rule blocks it.
+
+The Windows enforcement app (`src/BrainRotBlocker.App`) is a modern **Avalonia**
+desktop app (light/dark theming) that observes selected tabs in supported
+browser windows through Windows UI Automation, accounts time against the rules,
+and closes the selected tab with Ctrl+W when a rule blocks it. It has been
+live-tested locally against Firefox, Chrome, and Edge.
+
+The app starts with paired primary/watchdog roles by default. If either role is
+killed, the other restarts it. Normal startup also registers the app in the
+current user's Windows Run key. Strict mode can be activated from the UI for a
+flexible duration (any number of minutes, hours, or days) behind a double opt-in;
+while active, the app uses the locked configuration snapshot captured at
+activation and ignores later config changes until the deadline passes.
+
+It ships as a single self-contained **`BrainRotBlocker.exe`** that doubles as a
+one-click, no-admin installer (ADR-008): running the downloaded exe offers to
+install it per-user under `%LOCALAPPDATA%\Programs`, register autostart, and add
+an "Apps & features" entry. Uninstalling from Windows Settings runs the app's own
+code and **refuses while strict mode is active** — manual file deletion still
+works, but the easy three-click uninstall does not.
 
 ### Build and test
 
@@ -26,6 +60,56 @@ dotnet test
 
 The rule set is configurable without recompiling; see
 [config/default-config.json](config/default-config.json).
+
+### Run the app
+
+```sh
+dotnet run --project src/BrainRotBlocker.App
+```
+
+The app loads `config/default-config.json` when run from the repository, starts
+the paired watchdog process, and registers current-user startup. You can use
+another ruleset and an optional diagnostic log:
+
+```sh
+dotnet run --project src/BrainRotBlocker.App -- --config path\to\config.json --log path\to\brainrotblocker.log
+```
+
+For temporary tests that must not leave a watchdog or startup entry behind:
+
+```sh
+dotnet run --project src/BrainRotBlocker.App -- --no-install-prompt --no-watchdog --no-startup
+```
+
+To produce the single-file distributable (one downloadable exe, no runtime needed
+on the target):
+
+```sh
+dotnet publish src/BrainRotBlocker.App -c Release -r win-x64 --self-contained true ^
+  -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish
+```
+
+The resulting `publish\BrainRotBlocker.exe` is what a user downloads and
+double-clicks. It self-installs (`--install`), and the registered uninstall runs
+`--uninstall` (which refuses during strict mode).
+
+Closing the window leaves enforcement running in the tray. The UI is navigation,
+not a single dense screen: **Home** is a grid of rule cards (each showing its
+condition summary, sites, and live status); clicking a card opens a **focused
+edit screen** for just that rule (the grid is replaced, not crowded alongside).
+Strict mode and settings are their own screens; the theme choice
+(system / light / dark) lives in Settings rather than the chrome.
+
+Editing matches the user's mental model: create a rule, choose its sites by
+label + URL, and set when it applies. There are no hosts, path prefixes, regexes,
+or ids to manage — the URL is parsed for you, with an "include subpaths" toggle
+per site.
+
+Saving is explicit: the edit screen validates through the same core loader used
+at startup, persists to the active config file, reloads enforcement, and returns
+to the grid; Cancel discards. While strict mode is active it becomes the landing
+screen and the existing rules are locked, using the config snapshot captured at
+activation.
 
 ## Architecture Decision Records
 
@@ -518,3 +602,143 @@ targeting .NET 8). It does not change any prior decision.
   deliberately small and serializable to make that straightforward.
 - The browser observation layer must produce `BrowserWindowState` snapshots; it
   is the next workstream (plan §5.3).
+
+### ADR-007: Rule Model (What + When), Navigation UI, and Avalonia
+
+- **Status:** Accepted
+- **Date:** 2026-06-21
+- **Supersedes:** the configuration vocabulary and rule/budget cardinality of
+  ADR-004, and the Windows Forms UI of the first enforcement app.
+
+#### Context
+
+The first configuration UI exposed the internal model directly — rule id, name,
+host, path prefixes, path regex, budget id/name/allowance/reset, and a per-rule
+budget checklist. That leaks implementation detail and does not match how a user
+thinks. The product owner uses AppBlock (Android) and wants its model: the
+primary entity is a **Zeitplan/rule** — *what* to block plus *when* — where the
+"when" is a combined condition (an allowance, a time-of-day window, and selected
+weekdays). The owner also rejected a single dense screen and a master-detail
+split (no reason to see other rules while editing one), and rejected a
+harsh black/white "dark" theme and a prominent theme switch.
+
+#### Decision
+
+- **One entity: `Rule` = what + when.** A rule owns a list of sites and a single
+  combined condition. This replaces ADR-004's separate budget-groups and rules
+  and their N-to-M assignment. Sites are not exclusively owned: the same URL may
+  appear in several rules, and it is blocked if any active rule blocks it.
+- **The "when" condition.** Each rule has: an optional **allowance** of *N
+  minutes per hour* (null ⇒ *block completely*); an **active window** (all day,
+  or a local `from`–`to` range that may wrap past midnight); and a set of
+  **days**. The allowance refills on each clock hour. "Per hour" is deliberately
+  the only granularity — a daily allowance is psychologically weaker (spend it
+  once and you are done), so it was left out.
+- **URL-first sites.** The user types a URL; `SiteUrl.ToPattern` compiles it into
+  a `UrlPattern`. A bare host matches the whole site; a path matches that path
+  and, with "include subpaths", everything beneath it; a root address with
+  subpaths off matches only the front page (so Instagram DMs stay reachable).
+  Hosts, prefixes, regexes, and ids are never shown.
+- **Navigation UI, not one screen.** Home is a grid of rule cards; selecting one
+  replaces the grid with a focused edit screen for that rule alone. Settings and
+  strict mode are their own screens. Saving is explicit (PC convention); Cancel
+  discards.
+- **Strict mode placement.** When strict mode is active it is the landing screen
+  and existing rules are locked (the detailed strict-mode UX is deferred).
+- **Theme.** A soft, layered light/dark palette (theme dictionaries), not raw
+  Fluent defaults. The default follows the OS; the choice lives in Settings, not
+  in the chrome (a theme switch is needed only rarely).
+- **UI framework.** Rebuilt in Avalonia, replacing Windows Forms. `UseWPF`
+  remains enabled solely to reference the UI Automation client assemblies; no
+  WPF windows are created.
+
+#### Rejected Alternatives
+
+- **Expose the raw rule/budget fields.** Rejected: it surfaces internal detail
+  and was the core complaint.
+- **Separate "allowance" and "schedule" entities the user picks between.**
+  Rejected: AppBlock's model is one rule with a combined condition; forcing the
+  user to choose a machinery type up front inverts that.
+- **Per-day allowance.** Rejected for now as weaker against impulsive use; may be
+  added later.
+- **Master-detail in one window / a single dense scrolling screen.** Rejected:
+  there is no value in seeing other rules while editing one, and the owner should
+  never have to scroll for a handful of rules.
+- **A prominent theme toggle in the header.** Rejected: rarely needed; it belongs
+  behind Settings. Default follows the OS.
+- **Stay on Windows Forms / move to WPF.** Rejected: a modern, themeable UI was a
+  hard requirement.
+
+#### Consequences
+
+- The JSON schema is `rules[]` with `name`, optional `allowanceMinutes`,
+  `allDay`/`from`/`to`, `days`, and `sites[]` (`label`, `url`, `includeSubpaths`).
+  The shipped `config/default-config.json` and the editor round-trip use it; the
+  editor writes camelCase. Old-schema files do not load and fall back to the
+  built-in defaults.
+- Core and app tests were rewritten for the rule model, with new coverage for
+  windowed/wrapping active times, block-completely vs allowance, hourly refill,
+  and URL→pattern compilation.
+- Persisting rule state across restarts is still future work (as in ADR-006), as
+  is the detailed strict-mode screen.
+
+### ADR-008: Per-User Self-Installer with Strict-Mode-Aware Uninstall
+
+- **Status:** Accepted
+- **Date:** 2026-06-21
+
+#### Context
+
+The app needs an easy distribution path for non-technical users: download one
+file, double-click, done — without administrator rights or a runtime prerequisite
+(SmartScreen warnings are expected and accepted). It also needs to extend the
+strict-mode friction (ADR-001) to uninstallation: while a commitment is active,
+the ordinary "three-click" uninstall from Windows Settings must not work, though
+deliberate manual removal of files remains possible (that is acceptable friction,
+not a bypass guarantee).
+
+#### Decision
+
+- **One self-contained exe that is also the installer.** The product is published
+  as a single-file, self-contained `BrainRotBlocker.exe` (no .NET runtime needed
+  on the target). Run from outside the install location it shows a one-click
+  "Install BrainRotBlocker?" window; run from the install location it is the app.
+- **Per-user, no admin.** Installs to `%LOCALAPPDATA%\Programs\BrainRotBlocker`,
+  writes the `HKCU\…\Run` autostart value, and registers an
+  `HKCU\…\Uninstall\BrainRotBlocker` entry so it appears in Apps & features. All
+  HKCU + LocalAppData, so no elevation is required.
+- **Uninstall is our code.** The registered `UninstallString` re-invokes the exe
+  with `--uninstall`. That path checks strict mode first: if active it shows a
+  message and exits non-zero without removing anything (so Windows still lists the
+  app). Otherwise it stops the running instances, removes the registry entries and
+  app data, and schedules deletion of the install directory after exit (a small
+  retrying batch file, because a single-file exe stays briefly locked after it
+  exits).
+- **No third-party installer toolchain.** Keeping install/uninstall in the app
+  avoids an external dependency (e.g. Inno Setup) and lets the strict-mode check
+  live in the same code as the rest of the product.
+
+#### Rejected Alternatives
+
+- **MSIX / Microsoft Store packaging.** Rejected: uninstall is OS-managed and
+  cannot be refused, which defeats the strict-mode requirement; it also pushes
+  toward signing/elevation flows.
+- **Inno Setup / NSIS setup.exe.** Workable (per-user, and uninstall can be
+  aborted from installer script), but adds a build-time toolchain and splits the
+  strict-mode logic into installer script. Deferred unless a richer setup UI is
+  needed.
+- **Per-machine install (Program Files).** Rejected: requires admin, which the
+  product explicitly should not.
+
+#### Consequences
+
+- The strict-mode-aware uninstall increases real friction without claiming to be
+  unbypassable, consistent with ADR-001.
+- Install/uninstall logic is covered by unit tests (against a temporary directory
+  and registry subkey) and was verified end-to-end with the published exe:
+  install writes files + autostart + Apps & features entry; uninstall is refused
+  (exit 1, entry intact) while a strict-mode marker is present and succeeds
+  (entry + autostart removed, files self-deleted) once it is cleared.
+- The distributable is large (~150 MB) because it is self-contained including
+  WPF (referenced only for the UI Automation client) and Avalonia; slimming this
+  is possible future work.

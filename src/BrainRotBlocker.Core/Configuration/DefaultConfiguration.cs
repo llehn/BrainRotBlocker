@@ -1,59 +1,51 @@
 namespace BrainRotBlocker.Core.Configuration;
 
 /// <summary>
-/// A small built-in rule set used as a starting point and in tests. It is not
-/// the product boundary: the real rule set is loaded from configuration so new
-/// doom-scrolling surfaces can be added without recompiling (ADR-004).
+/// A small built-in configuration used as a starting point and in tests. It is
+/// not the product boundary: the real configuration is loaded from a file so new
+/// rules can be added without recompiling.
 /// </summary>
 public static class DefaultConfiguration
 {
-    public const string ShortFormVideoBudgetId = "short-form-video";
-    public const string FeedsBudgetId = "feeds";
+    public const string ShortVideoRuleId = "short-video";
+    public const string FeedsRuleId = "feeds";
 
     /// <summary>Builds the default configuration.</summary>
     public static BlockerConfiguration Create()
     {
-        var shortForm = new BudgetGroup(
-            ShortFormVideoBudgetId,
-            "Short-form video",
-            allowance: TimeSpan.FromMinutes(2),
-            resetInterval: TimeSpan.FromHours(1));
+        var shortVideo = new Rule(
+            ShortVideoRuleId,
+            "Short video",
+            new[]
+            {
+                Site("YouTube Shorts", "youtube.com/shorts"),
+                Site("Instagram Reels", "instagram.com/reels"),
+                Site("Facebook Reels", "facebook.com/reel"),
+                Site("TikTok", "tiktok.com/foryou"),
+            },
+            allowance: TimeSpan.FromMinutes(5),
+            allDay: true,
+            from: new TimeOnly(0, 0),
+            to: new TimeOnly(0, 0),
+            days: null);
 
-        var feeds = new BudgetGroup(
-            FeedsBudgetId,
-            "Algorithmic feeds",
-            allowance: TimeSpan.FromMinutes(2),
-            resetInterval: TimeSpan.FromHours(1));
+        var feeds = new Rule(
+            FeedsRuleId,
+            "Feeds",
+            new[]
+            {
+                // The Instagram home feed only — keeps DMs and Stories reachable.
+                Site("Instagram feed", "instagram.com/", includeSubpaths: false),
+            },
+            allowance: TimeSpan.FromMinutes(5),
+            allDay: true,
+            from: new TimeOnly(0, 0),
+            to: new TimeOnly(0, 0),
+            days: null);
 
-        var rules = new List<Rule>
-        {
-            new(
-                "youtube-shorts",
-                "YouTube Shorts",
-                new UrlPattern("youtube.com", pathPrefixes: new[] { "/shorts" }),
-                new[] { ShortFormVideoBudgetId }),
-            new(
-                "instagram-reels",
-                "Instagram Reels",
-                new UrlPattern("instagram.com", pathPrefixes: new[] { "/reels", "/reel" }),
-                new[] { ShortFormVideoBudgetId }),
-            new(
-                "facebook-reels",
-                "Facebook Reels",
-                new UrlPattern("facebook.com", pathPrefixes: new[] { "/reel" }),
-                new[] { ShortFormVideoBudgetId }),
-            new(
-                "tiktok-feed",
-                "TikTok feed",
-                new UrlPattern("tiktok.com", pathPrefixes: new[] { "/foryou", "/" }),
-                new[] { ShortFormVideoBudgetId }),
-            new(
-                "instagram-home-feed",
-                "Instagram home feed",
-                new UrlPattern("instagram.com", pathRegex: "^/$"),
-                new[] { FeedsBudgetId }),
-        };
-
-        return new BlockerConfiguration(rules, new[] { shortForm, feeds });
+        return new BlockerConfiguration(new[] { shortVideo, feeds });
     }
+
+    private static TargetSite Site(string label, string url, bool includeSubpaths = true)
+        => new(label, SiteUrl.ToPattern(url, includeSubpaths));
 }

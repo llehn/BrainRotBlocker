@@ -20,17 +20,16 @@ public class ShippedConfigTests
     {
         BlockerConfiguration config = LoadShipped();
         Assert.NotEmpty(config.Rules);
-        Assert.NotEmpty(config.BudgetGroups);
     }
 
     [Theory]
-    [InlineData("https://www.youtube.com/shorts/x", DefaultConfiguration.ShortFormVideoBudgetId)]
-    [InlineData("https://instagram.com/reels/x", DefaultConfiguration.ShortFormVideoBudgetId)]
-    [InlineData("https://instagram.com/", DefaultConfiguration.FeedsBudgetId)]
-    public void Shipped_config_matches_known_surfaces(string url, string expectedBudget)
+    [InlineData("https://www.youtube.com/shorts/x")]
+    [InlineData("https://instagram.com/reels/x")]
+    [InlineData("https://instagram.com/")]
+    public void Shipped_config_matches_known_surfaces(string url)
     {
         BlockerConfiguration config = LoadShipped();
-        Assert.Contains(expectedBudget, config.BudgetGroupIdsForUrl(new Uri(url)));
+        Assert.NotEmpty(config.MatchingRules(new Uri(url)));
     }
 
     [Theory]
@@ -39,6 +38,6 @@ public class ShippedConfigTests
     public void Shipped_config_leaves_useful_surfaces_alone(string url)
     {
         BlockerConfiguration config = LoadShipped();
-        Assert.Empty(config.BudgetGroupIdsForUrl(new Uri(url)));
+        Assert.Empty(config.MatchingRules(new Uri(url)));
     }
 }
