@@ -71,6 +71,10 @@ internal static class Program
             ? null
             : ProcessProtector.StartForPrimary(args);
 
+        var uiSettings = new UiSettingsStore();
+        // Resolve the language before first-run config so default rule names are localized.
+        Ui.Loc.Initialize(uiSettings.LoadLanguage());
+
         var strictModeStore = new StrictModeStore();
         LoadedConfiguration loaded = LoadConfiguration(args, strictModeStore);
 
@@ -83,8 +87,6 @@ internal static class Program
             loaded.FilePath,
             strictModeStore,
             TryGetOption(args, "--log", "-l"));
-
-        var uiSettings = new UiSettingsStore();
 
         controller.Start();
         try
@@ -111,16 +113,17 @@ internal static class Program
 
     private static void RunUninstall(Installer installer, bool silent)
     {
+        Ui.Loc.Initialize(new UiSettingsStore().LoadLanguage());
         var strict = new StrictModeStore();
         StrictModeSnapshot snapshot = strict.GetSnapshot();
         if (snapshot.IsActive)
         {
             if (!silent)
             {
+                string until = snapshot.ActiveUntilLocal?.ToString("dddd, HH:mm", Ui.Loc.Culture) ?? "";
                 NativeMethods.MessageBoxW(
                     IntPtr.Zero,
-                    "BrainRotBlocker can't be uninstalled while strict mode is active.\n\n" +
-                    $"Strict mode ends at {snapshot.ActiveUntilLocal:dddd, HH:mm}. Try again after that.",
+                    Ui.Loc.T("uninstall_blocked", until),
                     "BrainRotBlocker",
                     NativeMethods.MB_ICONERROR);
             }
@@ -146,7 +149,7 @@ internal static class Program
         {
             NativeMethods.MessageBoxW(
                 IntPtr.Zero,
-                "BrainRotBlocker has been removed.",
+                Ui.Loc.T("removed"),
                 "BrainRotBlocker",
                 NativeMethods.MB_ICONINFORMATION);
         }
@@ -234,16 +237,28 @@ internal static class Program
             return strictLoaded;
         }
 
+        // Resolution order: explicit --config, then a repo config (for dev), then
+        // the existing per-user config, and only on a true first run do we write
+        // freshly-generated (localized) defaults. Crucially we never overwrite an
+        // existing user config on launch.
+        string userPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "BrainRotBlocker",
+            "config.json");
+
         string? configPath = TryGetConfigPath(args) ?? ConfigurationPathResolver.FindDefaultConfig();
         if (configPath is null)
         {
-            string userPath = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "BrainRotBlocker",
-                "config.json");
+            configPath = File.Exists(userPath) ? userPath : null;
+        }
+
+        if (configPath is null)
+        {
+            // First run: write defaults with rule names in the detected language.
+            string defaults = BuildDefaultConfigJson();
             Directory.CreateDirectory(Path.GetDirectoryName(userPath)!);
-            File.WriteAllText(userPath, BuiltInDefaultJson);
-            return new LoadedConfiguration(DefaultConfiguration.Create(), userPath, BuiltInDefaultJson, userPath);
+            File.WriteAllText(userPath, defaults);
+            return new LoadedConfiguration(ConfigurationLoader.Load(defaults), userPath, defaults, userPath);
         }
 
         string json = File.ReadAllText(configPath);
@@ -253,10 +268,38 @@ internal static class Program
         }
         catch (ConfigurationException)
         {
-            // A malformed file should not stop the guard. Fall back to the built-in
+            // A malformed file should not stop the guard. Fall back to localized
             // defaults; the user can fix and re-save from the UI.
-            return new LoadedConfiguration(DefaultConfiguration.Create(), configPath, BuiltInDefaultJson, configPath);
+            string defaults = BuildDefaultConfigJson();
+            return new LoadedConfiguration(ConfigurationLoader.Load(defaults), configPath, defaults, configPath);
         }
+    }
+
+    /// <summary>The first-run rule set, with rule names in the active language.</summary>
+    private static string BuildDefaultConfigJson()
+    {
+        (string shortVideo, string feeds) = Ui.Loc.DefaultRuleNames();
+        return $$"""
+        {
+          "rules": [
+            {
+              "id": "short-video", "name": "{{shortVideo}}", "allowanceMinutes": 5, "allDay": true,
+              "sites": [
+                { "catalogId": "yt-shorts" },
+                { "catalogId": "ig-reels" },
+                { "catalogId": "fb-reels" },
+                { "catalogId": "tiktok" }
+              ]
+            },
+            {
+              "id": "feeds", "name": "{{feeds}}", "allowanceMinutes": 5, "allDay": true,
+              "sites": [
+                { "catalogId": "ig-feed" }
+              ]
+            }
+          ]
+        }
+        """;
     }
 
     private static string? TryGetConfigPath(string[] args) => TryGetOption(args, "--config", "-c");
@@ -289,26 +332,4 @@ internal static class Program
 
         return null;
     }
-
-    private const string BuiltInDefaultJson = """
-    {
-      "rules": [
-        {
-          "id": "short-video", "name": "Short video", "allowanceMinutes": 5, "allDay": true,
-          "sites": [
-            { "label": "YouTube Shorts", "url": "youtube.com/shorts", "includeSubpaths": true },
-            { "label": "Instagram Reels", "url": "instagram.com/reels", "includeSubpaths": true },
-            { "label": "Facebook Reels", "url": "facebook.com/reel", "includeSubpaths": true },
-            { "label": "TikTok", "url": "tiktok.com/foryou", "includeSubpaths": true }
-          ]
-        },
-        {
-          "id": "feeds", "name": "Feeds", "allowanceMinutes": 5, "allDay": true,
-          "sites": [
-            { "label": "Instagram feed", "url": "instagram.com/", "includeSubpaths": false }
-          ]
-        }
-      ]
-    }
-    """;
 }

@@ -22,6 +22,7 @@ internal sealed class App : Application
 
     public override void Initialize()
     {
+        Loc.Initialize(_settings.LoadLanguage());
         Styles.Add(new FluentTheme());
         Styles.Add(UiTheme.BuildStyles());
         Resources.MergedDictionaries.Add(UiTheme.BuildPalette());

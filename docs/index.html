@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BrainRotBlocker — put your doom-scrolling on a timer</title>
+  <meta name="description" content="A free Windows app that limits the sites quietly eating your day. Time-budget rules, scheduled blocks, and a strict mode that's genuinely hard to wriggle out of.">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <meta property="og:title" content="BrainRotBlocker">
+  <meta property="og:description" content="Put your doom-scrolling on a timer. Free, Windows, no admin needed.">
+  <meta property="og:image" content="assets/brain.svg">
+  <meta property="og:type" content="website">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="nav">
+    <a class="brand" href="#top">
+      <img src="assets/logo.svg" width="34" height="34" alt="">
+      <span>BrainRot<b>Blocker</b></span>
+    </a>
+    <nav class="nav-links">
+      <a href="#how">How it works</a>
+      <a href="#install">Install</a>
+      <a href="#features">Features</a>
+      <a class="ghost" href="https://github.com/llehn/BrainRotBlocker">GitHub</a>
+    </nav>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <div class="hero-copy">
+        <span class="eyebrow">Free · Windows · No admin needed</span>
+        <h1>Put your doom-scrolling<br>on a timer.</h1>
+        <p class="lede">Reels, Shorts, the endless feed — they don't want you to leave, and your brain keeps saying "just one more." <b>BrainRotBlocker</b> gives those sites a strict time budget and closes the tab when it's up. The friction your willpower has been missing.</p>
+        <div class="cta">
+          <a class="btn primary" href="https://github.com/llehn/BrainRotBlocker/releases/latest/download/BrainRotBlocker.exe">
+            ↓ Download for Windows
+          </a>
+          <a class="btn" href="https://github.com/llehn/BrainRotBlocker">View source</a>
+        </div>
+        <p class="fineprint">One <code>.exe</code>, ~150&nbsp;MB · installs per-user · 31 languages</p>
+      </div>
+      <div class="hero-art">
+        <div class="glow"></div>
+        <img src="assets/brain.svg" alt="A melting, hypnotized brain" class="mascot">
+        <span class="float f1">▶</span>
+        <span class="float f2">♥</span>
+        <span class="float f3">∞</span>
+        <span class="float f4">↻</span>
+      </div>
+    </section>
+
+    <section class="band">
+      <p>You opened it to check one message. Forty minutes later your thumb aches, the feed is still infinite, and you couldn't name a single thing you saw. <b>That's the loop.</b> Browser extensions get switched off in three clicks — so they don't work. This is built to be annoying to bypass on purpose.</p>
+    </section>
+
+    <section id="how" class="section">
+      <h2>How it works</h2>
+      <p class="section-sub">You make <b>rules</b>. A rule is simply <em>what</em> to block and <em>when</em>.</p>
+      <div class="grid cards">
+        <article class="card">
+          <div class="ic">🎯</div>
+          <h3>Pick what to block</h3>
+          <p>Choose from a catalog — Instagram Reels, YouTube Shorts, TikTok, X, Reddit and more — or add any custom site. No hosts or regex to fiddle with.</p>
+        </article>
+        <article class="card">
+          <div class="ic">⏳</div>
+          <h3>Allowance per hour</h3>
+          <p>"Allow 5 minutes per hour, then block." Enough for a peek and a laugh, not enough to disappear for the afternoon. Refills every hour.</p>
+        </article>
+        <article class="card">
+          <div class="ic">🌙</div>
+          <h3>Or a hard schedule</h3>
+          <p>Block completely during a window — say 23:00–07:00 on weekdays — so bedtime stays bedtime and mornings start without the feed.</p>
+        </article>
+        <article class="card">
+          <div class="ic">🔒</div>
+          <h3>Strict mode</h3>
+          <p>Lock everything for a set time behind a double opt-in. While it's on you can't edit the rules, quit, or even uninstall from Windows the easy way.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="showcase">
+      <img src="assets/app-mock.svg" alt="BrainRotBlocker showing two rules and live status" loading="lazy">
+      <p class="caption">Your rules at a glance — with live status: how much time is left, or what's blocked right now.</p>
+    </section>
+
+    <section id="install" class="section">
+      <h2>Install in three clicks</h2>
+      <div class="grid steps">
+        <article class="step">
+          <span class="num">1</span>
+          <h3>Download</h3>
+          <p>Grab the single <code>BrainRotBlocker.exe</code> and double-click it.</p>
+        </article>
+        <article class="step">
+          <span class="num">2</span>
+          <h3>Get past SmartScreen</h3>
+          <p>Windows will warn about an unknown publisher (it's unsigned, open-source). Click <b>More info → Run anyway</b>.</p>
+        </article>
+        <article class="step">
+          <span class="num">3</span>
+          <h3>Install</h3>
+          <p>Click <b>Install</b> in the prompt. It sets itself up for your user, starts with Windows, and begins protecting you.</p>
+        </article>
+      </div>
+      <p class="note">No administrator rights required — it installs under your own user folder. To remove it later, use Windows "Apps &amp; features" (this won't work while strict mode is active — that's the point).</p>
+      <div class="cta center">
+        <a class="btn primary" href="https://github.com/llehn/BrainRotBlocker/releases/latest/download/BrainRotBlocker.exe">↓ Download for Windows</a>
+      </div>
+    </section>
+
+    <section id="features" class="section">
+      <h2>The details</h2>
+      <div class="grid features">
+        <div class="feat"><b>Closes the tab, not the browser.</b> It watches the active tab via Windows UI Automation and closes only the offending page.</div>
+        <div class="feat"><b>Keeps the useful parts.</b> Block the reels and the feed while DMs and stories stay reachable.</div>
+        <div class="feat"><b>Two-process guard.</b> A paired watchdog restarts the app instantly if it's killed — no quick-quit escape.</div>
+        <div class="feat"><b>Survives restarts.</b> Registers per-user autostart, so a reboot doesn't get you off the hook.</div>
+        <div class="feat"><b>31 languages.</b> Follows your Windows language automatically, switchable in Settings.</div>
+        <div class="feat"><b>Light &amp; dark.</b> A clean, modern interface that follows your system theme.</div>
+        <div class="feat"><b>No account, no cloud.</b> Everything stays on your machine. Free and open source.</div>
+        <div class="feat"><b>Strict-mode-aware uninstall.</b> The easy uninstall is blocked while you're committed — deliberate friction, by design.</div>
+      </div>
+    </section>
+
+    <section class="band closer">
+      <h2>Your attention is worth more than the feed thinks.</h2>
+      <div class="cta center">
+        <a class="btn primary" href="https://github.com/llehn/BrainRotBlocker/releases/latest/download/BrainRotBlocker.exe">↓ Get BrainRotBlocker</a>
+        <a class="btn" href="https://github.com/llehn/BrainRotBlocker">Read the code</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="foot-brand">
+      <img src="assets/logo.svg" width="26" height="26" alt="">
+      <span>BrainRotBlocker</span>
+    </div>
+    <p>Free &amp; open source · Windows 10/11 · <a href="https://github.com/llehn/BrainRotBlocker">github.com/llehn/BrainRotBlocker</a></p>
+    <p class="muted">Not affiliated with any of the sites it limits. Use on devices you own.</p>
+  </footer>
+</body>
+</html>

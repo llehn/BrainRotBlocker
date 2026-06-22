@@ -3,10 +3,12 @@
   // without recompiling the application.
   //
   // A "rule" is what to block plus when to block it:
-  //   - "sites": the websites it blocks. Each is a label + the URL you'd type.
-  //       With "includeSubpaths": true the URL also matches pages beneath it.
-  //   - "allowanceMinutes": minutes of access allowed per hour. Omit it to
-  //       block the sites completely while the rule is active.
+  //   - "sites": the things it blocks. Pick from the built-in catalog with
+  //       "catalogId" (canonical label + matching), or add a custom site with a
+  //       "label" + "url" (+ optional "includeSubpaths": true to also match pages
+  //       beneath it).
+  //   - "allowanceMinutes": minutes of access allowed per hour. Omit it to block
+  //       the sites completely while the rule is active.
   //   - "allDay": true, or set "allDay": false with a "from"/"to" 24-hour window
   //       (a window whose "to" is earlier than "from" wraps past midnight).
   //   - "days": which weekdays the rule applies on. Omit for every day.
@@ -18,10 +20,10 @@
       "allowanceMinutes": 5,
       "allDay": true,
       "sites": [
-        { "label": "YouTube Shorts", "url": "youtube.com/shorts", "includeSubpaths": true },
-        { "label": "Instagram Reels", "url": "instagram.com/reels", "includeSubpaths": true },
-        { "label": "Facebook Reels", "url": "facebook.com/reel", "includeSubpaths": true },
-        { "label": "TikTok", "url": "tiktok.com/foryou", "includeSubpaths": true }
+        { "catalogId": "yt-shorts" },
+        { "catalogId": "ig-reels" },
+        { "catalogId": "fb-reels" },
+        { "catalogId": "tiktok" }
       ]
     },
     {
@@ -30,7 +32,7 @@
       "allowanceMinutes": 5,
       "allDay": true,
       "sites": [
-        { "label": "Instagram feed", "url": "instagram.com/", "includeSubpaths": false }
+        { "catalogId": "ig-feed" }
       ]
     }
   ]

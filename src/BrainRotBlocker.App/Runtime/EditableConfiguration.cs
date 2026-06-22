@@ -67,6 +67,7 @@ internal sealed class EditableConfiguration
 
     internal sealed class SiteDto
     {
+        public string? CatalogId { get; set; }
         public string? Label { get; set; }
         public string? Url { get; set; }
         public bool? IncludeSubpaths { get; set; }
@@ -105,6 +106,7 @@ internal sealed class EditableConfiguration
             {
                 copy.Sites.Add(new EditableSite
                 {
+                    CatalogId = site.CatalogId,
                     Label = site.Label,
                     Url = site.Url,
                     IncludeSubpaths = site.IncludeSubpaths,
@@ -132,6 +134,7 @@ internal sealed class EditableConfiguration
             {
                 rule.Sites.Add(new EditableSite
                 {
+                    CatalogId = site.CatalogId,
                     Label = site.Label ?? site.Url ?? "",
                     Url = site.Url ?? "",
                     IncludeSubpaths = site.IncludeSubpaths ?? true,
@@ -152,12 +155,7 @@ internal sealed class EditableConfiguration
             Days = Days.Count == AllDays.Length
                 ? null
                 : AllDays.Where(Days.Contains).Select(d => d.ToString()).ToList(),
-            Sites = Sites.Select(s => new SiteDto
-            {
-                Label = s.Label.Trim(),
-                Url = s.Url.Trim(),
-                IncludeSubpaths = s.IncludeSubpaths,
-            }).ToList(),
+            Sites = Sites.Select(s => s.ToDto()).ToList(),
         };
 
         private static TimeOnly ParseTime(string? text, TimeOnly fallback)
@@ -185,8 +183,30 @@ internal sealed class EditableConfiguration
 
     internal sealed class EditableSite
     {
+        public string? CatalogId { get; set; }
         public string Label { get; set; } = "";
         public string Url { get; set; } = "";
         public bool IncludeSubpaths { get; set; } = true;
+
+        /// <summary>True for built-in catalog picks (label fixed, URL not editable).</summary>
+        public bool IsCatalog => !string.IsNullOrWhiteSpace(CatalogId);
+
+        /// <summary>The label to show: canonical catalog label, or the custom label.</summary>
+        public string DisplayLabel =>
+            CatalogId is { } id && SiteCatalog.TryGet(id, out CatalogEntry entry)
+                ? entry.Label
+                : (string.IsNullOrWhiteSpace(Label) ? Url : Label);
+
+        internal SiteDto ToDto() => IsCatalog
+            ? new SiteDto { CatalogId = CatalogId }
+            : new SiteDto { Label = Label.Trim(), Url = Url.Trim(), IncludeSubpaths = IncludeSubpaths };
+
+        public static EditableSite FromCatalog(CatalogEntry entry) => new()
+        {
+            CatalogId = entry.Id,
+            Label = entry.Label,
+            Url = entry.Url,
+            IncludeSubpaths = entry.IncludeSubpaths,
+        };
     }
 }

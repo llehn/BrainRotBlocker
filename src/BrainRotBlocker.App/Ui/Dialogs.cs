@@ -44,9 +44,9 @@ internal static class Dialogs
     public static async Task<bool> StrictConfirm(Window owner, int amount, string unit)
     {
         var result = false;
-        var ack = new CheckBox { Content = "I understand I won't be able to edit my rules or stop until it ends." };
-        var cancel = UiTheme.Ghost("Cancel");
-        var ok = UiTheme.Primary("Lock in strict mode");
+        var ack = new CheckBox { Content = Loc.T("strict_ack") };
+        var cancel = UiTheme.Ghost(Loc.T("cancel"));
+        var ok = UiTheme.Primary(Loc.T("lock_in"));
         ok.Opacity = 0.45;
 
         var panel = new StackPanel
@@ -55,14 +55,14 @@ internal static class Dialogs
             Spacing = 16,
             Children =
             {
-                UiTheme.H2("Lock in strict mode?"),
-                UiTheme.Body($"This locks your rules for {amount} {unit}. There is no early exit — you can't edit rules or turn it off until the time is up."),
+                UiTheme.H2(Loc.T("strict_q")),
+                UiTheme.Body(Loc.T("strict_body", amount, unit)),
                 ack,
                 Actions(cancel, ok),
             },
         };
 
-        Window dialog = Shell(owner, "Lock in strict mode?", panel, width: 460);
+        Window dialog = Shell(owner, Loc.T("strict_q"), panel, width: 460);
 
         bool armed = false;
         ack.IsCheckedChanged += (_, _) => { armed = ack.IsChecked == true; ok.Opacity = armed ? 1 : 0.45; };
@@ -89,7 +89,7 @@ internal static class Dialogs
         return row;
     }
 
-    private static Window Shell(Window owner, string title, Control content, double width = 420) => new()
+    internal static Window Shell(Window owner, string title, Control content, double width = 420) => new()
     {
         Title = title,
         Width = width,

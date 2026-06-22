@@ -87,6 +87,16 @@ public static class ConfigurationLoader
         var sites = new List<TargetSite>();
         foreach (SiteDto site in dto.Sites ?? new())
         {
+            // Catalog items are canonical: resolve their pattern and label from the
+            // built-in catalog so an entry's matching can improve over time and a
+            // label can never drift from what it actually blocks.
+            if (!string.IsNullOrWhiteSpace(site.CatalogId)
+                && SiteCatalog.TryGet(site.CatalogId, out CatalogEntry entry))
+            {
+                sites.Add(new TargetSite(entry.Label, entry.ToPattern()));
+                continue;
+            }
+
             if (string.IsNullOrWhiteSpace(site.Url))
             {
                 throw new ConfigurationException($"Rule '{dto.Id}' has a site with no 'url'.");
@@ -176,6 +186,7 @@ public static class ConfigurationLoader
 
     private sealed class SiteDto
     {
+        public string? CatalogId { get; set; }
         public string? Label { get; set; }
         public string? Url { get; set; }
         public bool? IncludeSubpaths { get; set; }

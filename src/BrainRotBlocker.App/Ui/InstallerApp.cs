@@ -20,6 +20,7 @@ internal sealed class InstallerApp : Application
 
     public override void Initialize()
     {
+        Loc.Initialize(Loc.Auto); // pre-install: follow the Windows language
         Styles.Add(new FluentTheme());
         Styles.Add(UiTheme.BuildStyles());
         Resources.MergedDictionaries.Add(UiTheme.BuildPalette());
@@ -45,7 +46,7 @@ internal sealed class InstallerWindow : Window
     {
         _options = options;
 
-        Title = "Install BrainRotBlocker";
+        Title = Loc.T("install_title");
         Width = 460;
         SizeToContent = SizeToContent.Height;
         CanResize = false;
@@ -61,9 +62,9 @@ internal sealed class InstallerWindow : Window
             HorizontalAlignment = HorizontalAlignment.Center,
         };
 
-        var install = UiTheme.Primary("Install");
+        var install = UiTheme.Primary(Loc.T("install"));
         install.Click += (_, _) => DoInstall();
-        var cancel = UiTheme.Ghost("Not now");
+        var cancel = UiTheme.Ghost(Loc.T("not_now"));
         cancel.Click += (_, _) => Close();
 
         var actions = new StackPanel
@@ -74,12 +75,10 @@ internal sealed class InstallerWindow : Window
             Children = { cancel, install },
         };
 
-        var title = UiTheme.H1("Install BrainRotBlocker");
+        var title = UiTheme.H1(Loc.T("install_title"));
         title.HorizontalAlignment = HorizontalAlignment.Center;
 
-        var body = UiTheme.Muted(
-            "Installs for your user only (no admin needed), starts automatically with Windows, " +
-            "and adds an entry to Apps & features. While strict mode is active it cannot be uninstalled there.");
+        var body = UiTheme.Muted(Loc.T("install_body"));
         body.HorizontalAlignment = HorizontalAlignment.Center;
         body.TextAlignment = Avalonia.Media.TextAlignment.Center;
         body.MaxWidth = 380;
@@ -103,7 +102,7 @@ internal sealed class InstallerWindow : Window
         }
         catch (Exception ex)
         {
-            NativeMethods.MessageBoxW(IntPtr.Zero, ex.Message, "Install failed", NativeMethods.MB_ICONERROR);
+            NativeMethods.MessageBoxW(IntPtr.Zero, ex.Message, Loc.T("install_failed"), NativeMethods.MB_ICONERROR);
         }
     }
 }

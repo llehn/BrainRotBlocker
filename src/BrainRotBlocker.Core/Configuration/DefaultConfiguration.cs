@@ -16,13 +16,7 @@ public static class DefaultConfiguration
         var shortVideo = new Rule(
             ShortVideoRuleId,
             "Short video",
-            new[]
-            {
-                Site("YouTube Shorts", "youtube.com/shorts"),
-                Site("Instagram Reels", "instagram.com/reels"),
-                Site("Facebook Reels", "facebook.com/reel"),
-                Site("TikTok", "tiktok.com/foryou"),
-            },
+            new[] { Catalog("yt-shorts"), Catalog("ig-reels"), Catalog("fb-reels"), Catalog("tiktok") },
             allowance: TimeSpan.FromMinutes(5),
             allDay: true,
             from: new TimeOnly(0, 0),
@@ -32,11 +26,7 @@ public static class DefaultConfiguration
         var feeds = new Rule(
             FeedsRuleId,
             "Feeds",
-            new[]
-            {
-                // The Instagram home feed only — keeps DMs and Stories reachable.
-                Site("Instagram feed", "instagram.com/", includeSubpaths: false),
-            },
+            new[] { Catalog("ig-feed") },
             allowance: TimeSpan.FromMinutes(5),
             allDay: true,
             from: new TimeOnly(0, 0),
@@ -46,6 +36,9 @@ public static class DefaultConfiguration
         return new BlockerConfiguration(new[] { shortVideo, feeds });
     }
 
-    private static TargetSite Site(string label, string url, bool includeSubpaths = true)
-        => new(label, SiteUrl.ToPattern(url, includeSubpaths));
+    private static TargetSite Catalog(string id)
+    {
+        CatalogEntry entry = SiteCatalog.Entries.First(e => e.Id == id);
+        return new TargetSite(entry.Label, entry.ToPattern());
+    }
 }

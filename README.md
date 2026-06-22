@@ -14,10 +14,12 @@ The browser-independent **core product model** is implemented and tested
 (ADR-007, modelled on AppBlock's "Zeitpläne"): a **rule** is *what* to block plus
 *when*. Each rule combines:
 
-- **What:** a list of sites — a friendly label plus the URL the user types
-  (`instagram.com/reels`). The URL is compiled into the host/path matcher
-  automatically; an "include subpaths" toggle decides whether pages beneath the
-  address also match. The same site may appear in several rules.
+- **What:** a list of sites picked from a built-in **catalog** (Instagram Reels,
+  Instagram feed, YouTube Shorts, TikTok, Facebook Reels, X, Reddit, …) by name,
+  or added as a **custom** site (label + URL). Catalog picks are canonical
+  (matching resolved from the catalog, shown by label only); custom sites store a
+  URL with an "include subpaths" toggle. The same site may appear in several
+  rules.
 - **When:** a single combined condition —
   - an **allowance** of *N minutes per hour*, or **block completely** (no
     allowance);
@@ -41,6 +43,15 @@ current user's Windows Run key. Strict mode can be activated from the UI for a
 flexible duration (any number of minutes, hours, or days) behind a double opt-in;
 while active, the app uses the locked configuration snapshot captured at
 activation and ignores later config changes until the deadline passes.
+
+The UI is **localized into 31 languages** (the 24 official EU languages plus
+Russian, Ukrainian, Bosnian, Serbian (Cyrillic), Norwegian Bokmål, Turkish, and
+Catalan). It follows the Windows display language by default — including the
+one-click installer — and can be overridden in Settings (Automatic + a picker).
+English (US) is the canonical fallback; day names and number formatting follow
+the active culture. A test verifies every language has every key with matching
+placeholders. (Translations are machine-assisted; have a native speaker review
+before release.)
 
 It ships as a single self-contained **`BrainRotBlocker.exe`** that doubles as a
 one-click, no-admin installer (ADR-008): running the downloaded exe offers to

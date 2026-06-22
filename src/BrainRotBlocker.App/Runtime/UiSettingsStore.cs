@@ -36,27 +36,52 @@ internal sealed class UiSettingsStore
 
     public ThemePreference LoadTheme()
     {
+        State state = Read();
+        return Enum.TryParse(state.Theme, out ThemePreference theme) ? theme : ThemePreference.System;
+    }
+
+    public void SaveTheme(ThemePreference theme)
+    {
+        State state = Read();
+        state.Theme = theme.ToString();
+        Write(state);
+    }
+
+    /// <summary>Language preference: "auto" or a two-letter code (e.g. "de").</summary>
+    public string LoadLanguage()
+    {
+        string lang = Read().Language;
+        return string.IsNullOrWhiteSpace(lang) ? "auto" : lang;
+    }
+
+    public void SaveLanguage(string language)
+    {
+        State state = Read();
+        state.Language = language;
+        Write(state);
+    }
+
+    private State Read()
+    {
         try
         {
-            if (File.Exists(_path)
-                && JsonSerializer.Deserialize<State>(File.ReadAllText(_path)) is { } state
-                && Enum.TryParse(state.Theme, out ThemePreference theme))
+            if (File.Exists(_path) && JsonSerializer.Deserialize<State>(File.ReadAllText(_path)) is { } state)
             {
-                return theme;
+                return state;
             }
         }
         catch (Exception ex) when (ex is IOException or JsonException)
         {
         }
 
-        return ThemePreference.System;
+        return new State();
     }
 
-    public void SaveTheme(ThemePreference theme)
+    private void Write(State state)
     {
         try
         {
-            File.WriteAllText(_path, JsonSerializer.Serialize(new State { Theme = theme.ToString() }));
+            File.WriteAllText(_path, JsonSerializer.Serialize(state));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
@@ -66,5 +91,6 @@ internal sealed class UiSettingsStore
     private sealed class State
     {
         public string Theme { get; set; } = nameof(ThemePreference.System);
+        public string Language { get; set; } = "auto";
     }
 }
