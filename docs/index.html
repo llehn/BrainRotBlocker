@@ -22,26 +22,25 @@
       <span>BrainRot<b>Blocker</b></span>
     </a>
     <nav class="nav-links">
-      <a href="#how">How it works</a>
-      <a href="#install">Install</a>
-      <a href="#features">Features</a>
+      <a href="#how" data-i18n="nav.how">How it works</a>
+      <a href="#install" data-i18n="nav.install">Install</a>
+      <a href="#features" data-i18n="nav.features">Features</a>
       <a class="ghost" href="https://github.com/llehn/BrainRotBlocker">GitHub</a>
+      <select id="langsel" class="langsel" aria-label="Language"></select>
     </nav>
   </header>
 
   <main id="top">
     <section class="hero">
       <div class="hero-copy">
-        <span class="eyebrow">Free · Windows · No admin needed</span>
-        <h1>Put your doom-scrolling<br>on a timer.</h1>
-        <p class="lede">Reels, Shorts, the endless feed — they don't want you to leave, and your brain keeps saying "just one more." <b>BrainRotBlocker</b> gives those sites a strict time budget and closes the tab when it's up. The friction your willpower has been missing.</p>
+        <span class="eyebrow" data-i18n="hero.eyebrow">Free · Windows · No admin needed</span>
+        <h1 data-i18n="hero.h1">Put your doom-scrolling<br>on a timer.</h1>
+        <p class="lede" data-i18n="hero.lede">Reels, Shorts, the endless feed — they don't want you to leave, and your brain keeps saying "just one more." <b>BrainRotBlocker</b> gives those sites a strict time budget and closes the tab when it's up. The friction your willpower has been missing.</p>
         <div class="cta">
-          <a class="btn primary" href="https://github.com/llehn/BrainRotBlocker/releases/latest/download/BrainRotBlocker.exe">
-            ↓ Download for Windows
-          </a>
-          <a class="btn" href="https://github.com/llehn/BrainRotBlocker">View source</a>
+          <a class="btn primary" href="https://github.com/llehn/BrainRotBlocker/releases/latest/download/BrainRotBlocker.exe" data-i18n="hero.download">↓ Download for Windows</a>
+          <a class="btn" href="https://github.com/llehn/BrainRotBlocker" data-i18n="hero.source">View source</a>
         </div>
-        <p class="fineprint">One <code>.exe</code>, ~150&nbsp;MB · installs per-user · 31 languages</p>
+        <p class="fineprint" data-i18n="hero.fineprint">One <code>.exe</code>, ~150&nbsp;MB · installs per-user · 31 languages</p>
       </div>
       <div class="hero-art">
         <div class="glow"></div>
@@ -54,85 +53,85 @@
     </section>
 
     <section class="band">
-      <p>You opened it to check one message. Forty minutes later your thumb aches, the feed is still infinite, and you couldn't name a single thing you saw. <b>That's the loop.</b> Browser extensions get switched off in three clicks — so they don't work. This is built to be annoying to bypass on purpose.</p>
+      <p data-i18n="band1">You opened it to check one message. Forty minutes later your thumb aches, the feed is still infinite, and you couldn't name a single thing you saw. <b>That's the loop.</b> Browser extensions get switched off in three clicks — so they don't work. This is built to be annoying to bypass on purpose.</p>
     </section>
 
     <section id="how" class="section">
-      <h2>How it works</h2>
-      <p class="section-sub">You make <b>rules</b>. A rule is simply <em>what</em> to block and <em>when</em>.</p>
+      <h2 data-i18n="how.title">How it works</h2>
+      <p class="section-sub" data-i18n="how.sub">You make <b>rules</b>. A rule is simply <em>what</em> to block and <em>when</em>.</p>
       <div class="grid cards">
         <article class="card">
           <div class="ic">🎯</div>
-          <h3>Pick what to block</h3>
-          <p>Choose from a catalog — Instagram Reels, YouTube Shorts, TikTok, X, Reddit and more — or add any custom site. No hosts or regex to fiddle with.</p>
+          <h3 data-i18n="card1.t">Pick what to block</h3>
+          <p data-i18n="card1.b">Choose from a catalog — Instagram Reels, YouTube Shorts, TikTok, X, Reddit and more — or add any custom site. No hosts or regex to fiddle with.</p>
         </article>
         <article class="card">
           <div class="ic">⏳</div>
-          <h3>Allowance per hour</h3>
-          <p>"Allow 5 minutes per hour, then block." Enough for a peek and a laugh, not enough to disappear for the afternoon. Refills every hour.</p>
+          <h3 data-i18n="card2.t">Allowance per hour</h3>
+          <p data-i18n="card2.b">"Allow 5 minutes per hour, then block." Enough for a peek and a laugh, not enough to disappear for the afternoon. Refills every hour.</p>
         </article>
         <article class="card">
           <div class="ic">🌙</div>
-          <h3>Or a hard schedule</h3>
-          <p>Block completely during a window — say 23:00–07:00 on weekdays — so bedtime stays bedtime and mornings start without the feed.</p>
+          <h3 data-i18n="card3.t">Or a hard schedule</h3>
+          <p data-i18n="card3.b">Block completely during a window — say 23:00–07:00 on weekdays — so bedtime stays bedtime and mornings start without the feed.</p>
         </article>
         <article class="card">
           <div class="ic">🔒</div>
-          <h3>Strict mode</h3>
-          <p>Lock everything for a set time behind a double opt-in. While it's on you can't edit the rules, quit, or even uninstall from Windows the easy way.</p>
+          <h3 data-i18n="card4.t">Strict mode</h3>
+          <p data-i18n="card4.b">Lock everything for a set time behind a double opt-in. While it's on you can't edit the rules, quit, or even uninstall from Windows the easy way.</p>
         </article>
       </div>
     </section>
 
     <section class="showcase">
       <img src="assets/app-mock.svg" alt="BrainRotBlocker showing two rules and live status" loading="lazy">
-      <p class="caption">Your rules at a glance — with live status: how much time is left, or what's blocked right now.</p>
+      <p class="caption" data-i18n="showcase.caption">Your rules at a glance — with live status: how much time is left, or what's blocked right now.</p>
     </section>
 
     <section id="install" class="section">
-      <h2>Install in three clicks</h2>
+      <h2 data-i18n="install.title">Install in three clicks</h2>
       <div class="grid steps">
         <article class="step">
           <span class="num">1</span>
-          <h3>Download</h3>
-          <p>Grab the single <code>BrainRotBlocker.exe</code> and double-click it.</p>
+          <h3 data-i18n="step1.t">Download</h3>
+          <p data-i18n="step1.b">Grab the single <code>BrainRotBlocker.exe</code> and double-click it.</p>
         </article>
         <article class="step">
           <span class="num">2</span>
-          <h3>Get past SmartScreen</h3>
-          <p>Windows will warn about an unknown publisher (it's unsigned, open-source). Click <b>More info → Run anyway</b>.</p>
+          <h3 data-i18n="step2.t">Get past SmartScreen</h3>
+          <p data-i18n="step2.b">Windows will warn about an unknown publisher (it's unsigned, open-source). Click <b>More info → Run anyway</b>.</p>
         </article>
         <article class="step">
           <span class="num">3</span>
-          <h3>Install</h3>
-          <p>Click <b>Install</b> in the prompt. It sets itself up for your user, starts with Windows, and begins protecting you.</p>
+          <h3 data-i18n="step3.t">Install</h3>
+          <p data-i18n="step3.b">Click <b>Install</b> in the prompt. It sets itself up for your user, starts with Windows, and begins protecting you.</p>
         </article>
       </div>
-      <p class="note">No administrator rights required — it installs under your own user folder. To remove it later, use Windows "Apps &amp; features" (this won't work while strict mode is active — that's the point).</p>
+      <p class="note" data-i18n="install.note">No administrator rights required — it installs under your own user folder. To remove it later, use Windows "Apps &amp; features" (this won't work while strict mode is active — that's the point).</p>
       <div class="cta center">
-        <a class="btn primary" href="https://github.com/llehn/BrainRotBlocker/releases/latest/download/BrainRotBlocker.exe">↓ Download for Windows</a>
+        <a class="btn primary" href="https://github.com/llehn/BrainRotBlocker/releases/latest/download/BrainRotBlocker.exe" data-i18n="hero.download">↓ Download for Windows</a>
       </div>
     </section>
 
     <section id="features" class="section">
-      <h2>The details</h2>
+      <h2 data-i18n="features.title">The details</h2>
       <div class="grid features">
-        <div class="feat"><b>Closes the tab, not the browser.</b> It watches the active tab via Windows UI Automation and closes only the offending page.</div>
-        <div class="feat"><b>Keeps the useful parts.</b> Block the reels and the feed while DMs and stories stay reachable.</div>
-        <div class="feat"><b>Two-process guard.</b> A paired watchdog restarts the app instantly if it's killed — no quick-quit escape.</div>
-        <div class="feat"><b>Survives restarts.</b> Registers per-user autostart, so a reboot doesn't get you off the hook.</div>
-        <div class="feat"><b>31 languages.</b> Follows your Windows language automatically, switchable in Settings.</div>
-        <div class="feat"><b>Light &amp; dark.</b> A clean, modern interface that follows your system theme.</div>
-        <div class="feat"><b>No account, no cloud.</b> Everything stays on your machine. Free and open source.</div>
-        <div class="feat"><b>Strict-mode-aware uninstall.</b> The easy uninstall is blocked while you're committed — deliberate friction, by design.</div>
+        <div class="feat" data-i18n="feat1"><b>Closes the tab, not the browser.</b> It watches the active tab via Windows UI Automation and closes only the offending page.</div>
+        <div class="feat" data-i18n="feat2"><b>Keeps the useful parts.</b> Block the reels and the feed while DMs and stories stay reachable.</div>
+        <div class="feat" data-i18n="feat3"><b>Two-process guard.</b> A paired watchdog restarts the app instantly if it's killed — no quick-quit escape.</div>
+        <div class="feat" data-i18n="feat4"><b>Survives restarts.</b> Registers per-user autostart, so a reboot doesn't get you off the hook.</div>
+        <div class="feat" data-i18n="feat5"><b>31 languages.</b> Follows your Windows language automatically, switchable in Settings.</div>
+        <div class="feat" data-i18n="feat6"><b>Light &amp; dark.</b> A clean, modern interface that follows your system theme.</div>
+        <div class="feat" data-i18n="feat7"><b>No account, no cloud.</b> Everything stays on your machine. Free and open source.</div>
+        <div class="feat" data-i18n="feat8"><b>Strict-mode-aware uninstall.</b> The easy uninstall is blocked while you're committed — deliberate friction, by design.</div>
       </div>
     </section>
 
     <section class="band closer">
-      <h2>Your attention is worth more than the feed thinks.</h2>
+      <h2 data-i18n="closer.title">Your attention is worth more than the feed thinks.</h2>
       <div class="cta center">
-        <a class="btn primary" href="https://github.com/llehn/BrainRotBlocker/releases/latest/download/BrainRotBlocker.exe">↓ Get BrainRotBlocker</a>
-        <a class="btn" href="https://github.com/llehn/BrainRotBlocker">Read the code</a>
+        <a class="btn primary" href="https://github.com/llehn/BrainRotBlocker/releases/latest/download/BrainRotBlocker.exe" data-i18n="closer.download">↓ Get BrainRotBlocker</a>
+        <a class="btn" href="https://github.com/llehn/BrainRotBlocker" data-i18n="closer.source">Read the code</a>
       </div>
     </section>
   </main>
@@ -142,8 +141,10 @@
       <img src="assets/logo.svg" width="26" height="26" alt="">
       <span>BrainRotBlocker</span>
     </div>
-    <p>Free &amp; open source · Windows 10/11 · <a href="https://github.com/llehn/BrainRotBlocker">github.com/llehn/BrainRotBlocker</a></p>
-    <p class="muted">Not affiliated with any of the sites it limits. Use on devices you own.</p>
+    <p data-i18n="footer.tagline">Free &amp; open source · Windows 10/11 · <a href="https://github.com/llehn/BrainRotBlocker">github.com/llehn/BrainRotBlocker</a></p>
+    <p class="muted" data-i18n="footer.muted">Not affiliated with any of the sites it limits. Use on devices you own.</p>
   </footer>
+
+  <script src="i18n.js"></script>
 </body>
 </html>

@@ -53,6 +53,12 @@ h1, h2, h3 { line-height: 1.15; margin: 0; }
   padding: 7px 14px; border-radius: 9px;
 }
 .nav-links .ghost:hover { border-color: var(--accent); }
+.langsel {
+  background: var(--surface2); color: var(--text);
+  border: 1px solid var(--border); border-radius: 9px;
+  padding: 7px 10px; font: inherit; font-size: 0.9rem; cursor: pointer;
+}
+.langsel:hover { border-color: var(--accent); }
 
 /* hero */
 .hero {
