@@ -18,7 +18,7 @@ internal sealed class UpdateService : IDisposable
     public const string SignatureAssetName = "update.json.sig";
 
     private static readonly TimeSpan InitialDelay = TimeSpan.FromMinutes(2);
-    private static readonly TimeSpan CheckInterval = TimeSpan.FromHours(6);
+    private static readonly TimeSpan CheckInterval = TimeSpan.FromMinutes(1);
 
     private readonly IReleaseSource _source;
     private readonly UpdateSignature _signature;
