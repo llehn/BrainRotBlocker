@@ -1,0 +1,82 @@
+name: Release
+
+# Continuous deployment: every push to master is tested, and if green, built,
+# signed, and published as a release. Installed apps then auto-update to it.
+on:
+  push:
+    branches: [master]
+
+permissions:
+  contents: write
+
+# Never run two releases at once; queue them so versions stay ordered.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history so the commit count is the version
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Compute version
+        id: version
+        run: |
+          $count = (git rev-list --count HEAD).Trim()
+          $version = "1.0.$count"
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Output "Version: $version"
+
+      - name: Build
+        run: dotnet build -c Release -p:Version=${{ steps.version.outputs.version }}
+
+      # The release gate: a failed test means no release is published.
+      - name: Test
+        run: dotnet test -c Release --no-build
+
+      - name: Publish single-file build
+        run: |
+          dotnet publish src/BrainRotDoctor.App -c Release -r win-x64 --self-contained true `
+            -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:EnableCompressionInSingleFile=true -p:Version=${{ steps.version.outputs.version }} `
+            -o publish
+
+      - name: Write signed update manifest
+        env:
+          BRD_UPDATE_PRIVATE_KEY: ${{ secrets.BRD_UPDATE_PRIVATE_KEY }}
+        run: |
+          $exe = "publish/BrainRotDoctor.exe"
+          $sha = (Get-FileHash $exe -Algorithm SHA256).Hash.ToLower()
+          $size = (Get-Item $exe).Length
+          $manifest = [ordered]@{
+            version = "${{ steps.version.outputs.version }}"
+            asset   = "BrainRotDoctor.exe"
+            sha256  = $sha
+            size    = $size
+          }
+          $manifest | ConvertTo-Json -Compress | Set-Content -NoNewline -Path publish/update.json -Encoding utf8
+          ./tools/release/sign-manifest.ps1 -ManifestPath publish/update.json -OutPath publish/update.json.sig
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          gh release create "v$version" `
+            --title "v$version" `
+            --target ${{ github.sha }} `
+            --generate-notes `
+            publish/BrainRotDoctor.exe `
+            publish/update.json `
+            publish/update.json.sig

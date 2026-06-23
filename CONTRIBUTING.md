@@ -1,4 +1,4 @@
-# Contributing to BrainRotBlocker
+# Contributing to BrainRotDoctor
 
 Thanks for your interest in contributing! This document explains how to build,
 test, and propose changes.
@@ -11,9 +11,9 @@ participating you agree to uphold it.
 ## Prerequisites
 
 - **.NET 10 SDK** (LTS). Check with `dotnet --version`.
-- **Windows 10/11** for the enforcement app (`BrainRotBlocker.App` targets
+- **Windows 10/11** for the enforcement app (`BrainRotDoctor.App` targets
   `net10.0-windows` and uses Windows UI Automation). The core library
-  (`BrainRotBlocker.Core`) is platform-independent and builds/tests anywhere.
+  (`BrainRotDoctor.Core`) is platform-independent and builds/tests anywhere.
 
 ## Build and test
 
@@ -29,17 +29,17 @@ first.
 ### Running the app from a checkout
 
 ```sh
-dotnet run --project src/BrainRotBlocker.App
+dotnet run --project src/BrainRotDoctor.App
 ```
 
 For temporary tests that must not leave a watchdog or a startup entry behind:
 
 ```sh
-dotnet run --project src/BrainRotBlocker.App -- --no-install-prompt --no-watchdog --no-startup
+dotnet run --project src/BrainRotDoctor.App -- --no-install-prompt --no-watchdog --no-startup
 ```
 
 Your edits in the app are saved to your per-user config
-(`%LOCALAPPDATA%\BrainRotBlocker\config.json`), **not** to the shipped
+(`%LOCALAPPDATA%\BrainRotDoctor\config.json`), **not** to the shipped
 `config/default-config.json`. The shipped file is only a read-only seed used on
 first run. To iterate on the shipped default itself, edit that file directly
 and run with `--config config/default-config.json`.
@@ -52,12 +52,12 @@ them will not compile:
 - **Warnings are errors** (`TreatWarningsAsErrors`). Keep the build clean.
 - **Nullable reference types** are enabled. No new nullable warnings.
 - **Implicit usings** are enabled.
-- Public API in `BrainRotBlocker.Core` is documented with XML comments;
+- Public API in `BrainRotDoctor.Core` is documented with XML comments;
   per-member comments are not required everywhere (CS1591 is relaxed).
 
 Match the surrounding style: small focused types, clock/dependency injection in
 the core so logic stays deterministic and testable, and no OS dependencies in
-`BrainRotBlocker.Core`.
+`BrainRotDoctor.Core`.
 
 ## Tests
 
@@ -91,7 +91,7 @@ large change — those areas are governed by the ADRs (ADR-001 through ADR-008) 
 
 ## Localization
 
-The UI ships in 31 languages (`src/BrainRotBlocker.App/Ui/Strings.cs`).
+The UI ships in 31 languages (`src/BrainRotDoctor.App/Ui/Strings.cs`).
 `LocalizationTests` verifies every language has every key with matching
 placeholders, so when you add or rename a string key, update **all** languages
 (machine-assisted translations are acceptable; a native-speaker review is

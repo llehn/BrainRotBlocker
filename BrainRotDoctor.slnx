@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/BrainRotDoctor.App/BrainRotDoctor.App.csproj" />
+    <Project Path="src/BrainRotDoctor.Core/BrainRotDoctor.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/BrainRotDoctor.App.Tests/BrainRotDoctor.App.Tests.csproj" />
+    <Project Path="tests/BrainRotDoctor.Core.Tests/BrainRotDoctor.Core.Tests.csproj" />
+  </Folder>
+</Solution>

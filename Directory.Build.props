@@ -1,5 +1,9 @@
 <Project>
   <PropertyGroup>
+    <!-- Local/dev version. The release workflow overrides it per build with
+         1.0.<commit-count> (-p:Version=...); the running app reads it back via
+         AppVersion to drive the auto-updater's forward-only version check. -->
+    <Version>1.0.0</Version>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>

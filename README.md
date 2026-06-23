@@ -1,13 +1,13 @@
-# BrainRotBlocker
+# BrainRotDoctor
 
-BrainRotBlocker is a Windows application for limiting Instagram
+BrainRotDoctor is a Windows application for limiting Instagram
 doom-scrolling while retaining access to useful surfaces such as Direct
 Messages and Stories.
 
 ## Status
 
 The browser-independent **core product model** is implemented and tested
-(`src/BrainRotBlocker.Core`). It is organized around the user's mental model
+(`src/BrainRotDoctor.Core`). It is organized around the user's mental model
 (ADR-007, modelled on AppBlock's "Zeitpläne"): a **rule** is *what* to block plus
 *when*. Each rule combines:
 
@@ -28,7 +28,7 @@ A rule blocks its sites whenever it is active and either set to block completely
 or out of allowance for the current hour. Several rules may target the same site;
 the site is blocked if any active rule blocks it.
 
-The Windows enforcement app (`src/BrainRotBlocker.App`) is a modern **Avalonia**
+The Windows enforcement app (`src/BrainRotDoctor.App`) is a modern **Avalonia**
 desktop app (light/dark theming) that observes selected tabs in supported
 browser windows through Windows UI Automation, accounts time against the rules,
 and closes the selected tab with Ctrl+W when a rule blocks it. It has been
@@ -50,7 +50,7 @@ the active culture. A test verifies every language has every key with matching
 placeholders. (Translations are machine-assisted; have a native speaker review
 before release.)
 
-It ships as a single self-contained **`BrainRotBlocker.exe`** that doubles as a
+It ships as a single self-contained **`BrainRotDoctor.exe`** that doubles as a
 one-click, no-admin installer (ADR-008): running the downloaded exe offers to
 install it per-user under `%LOCALAPPDATA%\Programs`, register autostart, and add
 an "Apps & features" entry. Uninstalling from Windows Settings runs the app's own
@@ -72,7 +72,7 @@ The rule set is configurable without recompiling; see
 ### Run the app
 
 ```sh
-dotnet run --project src/BrainRotBlocker.App
+dotnet run --project src/BrainRotDoctor.App
 ```
 
 The app loads `config/default-config.json` when run from the repository, starts
@@ -80,20 +80,38 @@ the paired watchdog process, and registers current-user startup. You can use
 another ruleset and an optional diagnostic log:
 
 ```sh
-dotnet run --project src/BrainRotBlocker.App -- --config path\to\config.json --log path\to\brainrotblocker.log
+dotnet run --project src/BrainRotDoctor.App -- --config path\to\config.json --log path\to\brainrotdoctor.log
 ```
 
-For temporary tests that must not leave a watchdog or startup entry behind:
+For temporary tests that must not leave a watchdog, startup entry, or trigger the
+auto-updater:
 
 ```sh
-dotnet run --project src/BrainRotBlocker.App -- --no-install-prompt --no-watchdog --no-startup
+dotnet run --project src/BrainRotDoctor.App -- --no-install-prompt --no-watchdog --no-startup --no-update
 ```
 
-To produce the single-file distributable (one downloadable exe, no runtime needed
-on the target):
+### Releases and silent auto-update
+
+Installed builds update themselves silently (ADR-009). Every few hours the app
+checks the latest [GitHub Release](https://github.com/llehn/BrainRotDoctor/releases),
+verifies a signed `update.json` manifest and the new exe's SHA-256, and — only for
+a strictly newer version (never a downgrade or reinstall) — stages the binary and
+swaps it in, coordinating with the watchdog so the new build takes over without a
+window. There is no update UI by design; applied versions are recorded to
+`%LOCALAPPDATA%\BrainRotDoctor\update\history.log`.
+
+Releases are continuous: every push to `master` is tested, and if green, built,
+signed, and published automatically (version `1.0.<commit-count>`, always
+increasing). A failing test means no release. There is nothing to tag or click —
+push to `master` and installed apps update themselves within hours. See
+[tools/release/README.md](tools/release/README.md) for the one-time signing-key
+setup.
+
+To produce the single-file distributable locally (one downloadable exe, no runtime
+needed on the target):
 
 ```sh
-dotnet publish src/BrainRotBlocker.App -c Release -r win-x64 --self-contained true ^
+dotnet publish src/BrainRotDoctor.App -c Release -r win-x64 --self-contained true ^
   -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true ^
   -p:EnableCompressionInSingleFile=true -o publish
 ```
@@ -101,7 +119,7 @@ dotnet publish src/BrainRotBlocker.App -c Release -r win-x64 --self-contained tr
 Compression keeps it a single double-click exe (~71&nbsp;MB) that self-extracts at
 launch; installed size is unaffected.
 
-The resulting `publish\BrainRotBlocker.exe` is what a user downloads and
+The resulting `publish\BrainRotDoctor.exe` is what a user downloads and
 double-clicks. It self-installs (`--install`), and the registered uninstall runs
 `--uninstall` (which refuses during strict mode).
 
@@ -150,7 +168,7 @@ distribution conventions must not silently weaken strict mode.
 
 #### Decision
 
-BrainRotBlocker will provide an optional strict mode with these rules:
+BrainRotDoctor will provide an optional strict mode with these rules:
 
 - While a strict-mode commitment is active, the product provides no emergency
   bypass, recovery shortcut, delayed escape, or ordinary uninstall path.
@@ -311,7 +329,7 @@ browsers.
 **Browser extension as the authoritative enforcement layer**
 
 Rejected because the user can disable an extension too quickly. It recreates
-the weakness that BrainRotBlocker is intended to solve.
+the weakness that BrainRotDoctor is intended to solve.
 
 **Browser extension backed by a native component**
 
@@ -340,7 +358,7 @@ require privileges or Windows integration that cannot be selected in advance.
 
 #### Decision
 
-Required functionality has priority over security tradeoffs. BrainRotBlocker
+Required functionality has priority over security tradeoffs. BrainRotDoctor
 must perform its intended blocking and commitment-enforcement behavior; a
 secure design that cannot perform that behavior provides no product value and
 is rejected.
@@ -403,7 +421,7 @@ problem is getting pulled into the repeated scrolling loop.
 
 #### Decision
 
-BrainRotBlocker blocks configured doom-scrolling surfaces using recurring time
+BrainRotDoctor blocks configured doom-scrolling surfaces using recurring time
 budgets.
 
 - URL/page rules identify configured doom-scrolling surfaces.
@@ -555,7 +573,7 @@ be wrong. The guiding rule is to prefer blocking in uncertain cases.
 The first implementation step (plan §5.2 and the First Milestone) is the
 browser-independent core: rules, budget groups, time accounting, and the
 blocking decision. ADR-004 and ADR-005 fix the behavior; this ADR records the
-concrete decisions made while implementing it in C# (`BrainRotBlocker.Core`,
+concrete decisions made while implementing it in C# (`BrainRotDoctor.Core`,
 targeting .NET 8). It does not change any prior decision.
 
 #### Decision
@@ -712,12 +730,12 @@ not a bypass guarantee).
 #### Decision
 
 - **One self-contained exe that is also the installer.** The product is published
-  as a single-file, self-contained `BrainRotBlocker.exe` (no .NET runtime needed
+  as a single-file, self-contained `BrainRotDoctor.exe` (no .NET runtime needed
   on the target). Run from outside the install location it shows a one-click
-  "Install BrainRotBlocker?" window; run from the install location it is the app.
-- **Per-user, no admin.** Installs to `%LOCALAPPDATA%\Programs\BrainRotBlocker`,
+  "Install BrainRotDoctor?" window; run from the install location it is the app.
+- **Per-user, no admin.** Installs to `%LOCALAPPDATA%\Programs\BrainRotDoctor`,
   writes the `HKCU\…\Run` autostart value, and registers an
-  `HKCU\…\Uninstall\BrainRotBlocker` entry so it appears in Apps & features. All
+  `HKCU\…\Uninstall\BrainRotDoctor` entry so it appears in Apps & features. All
   HKCU + LocalAppData, so no elevation is required.
 - **Uninstall is our code.** The registered `UninstallString` re-invokes the exe
   with `--uninstall`. That path checks strict mode first: if active it shows a
@@ -754,6 +772,66 @@ not a bypass guarantee).
 - The distributable is large (~150 MB) because it is self-contained including
   WPF (referenced only for the UI Automation client) and Avalonia; slimming this
   is possible future work.
+
+### ADR-009: Silent, Signed Auto-Update from GitHub Releases
+
+- **Status:** Accepted
+- **Date:** 2026-06-23
+
+#### Context
+
+Because new doom-scrolling surfaces appear over time and enforcement bugs must be
+fixable, installed builds need to update without the user's involvement. A
+self-protection tool that can rewrite its own binary is also an attack surface
+against the user themselves (a tampered or downgraded build is a strict-mode
+bypass), and the existing watchdog (ADR-008 lineage) respawns the primary within
+~650 ms, so the running, file-locked exe cannot simply be replaced.
+
+#### Decision
+
+- **GitHub Releases as the channel.** Each release publishes `BrainRotDoctor.exe`
+  plus a small `update.json` manifest (version, asset name, SHA-256, size) and an
+  `update.json.sig`. Releases are continuous — every push to `master` is tested,
+  then (if green) built, hashed, manifest-written, signed, and published, with a
+  monotonic `1.0.<commit-count>` version. The manual `publish/` flow is retired.
+- **Signed manifest + hashed binary.** The manifest is signed with an ECDSA P-256
+  key (built-in `System.Security.Cryptography`, no new dependency) whose public
+  half is embedded in the app and private half is a CI secret. The app trusts a
+  build only if the signature verifies and the downloaded exe's SHA-256 matches
+  the signed manifest. Updates are **forward-only** (strictly greater version),
+  blocking downgrade/replay.
+- **Completely silent, always on.** A background timer checks every few hours;
+  failures are swallowed and retried. Updates apply even during strict mode
+  (they are forward fixes, not a user escape). No user-facing UI; applied
+  versions are logged locally for a possible future "what's new" view.
+- **Watchdog-aware swap with recovery.** The verified binary is staged, then runs
+  itself in an `--role apply-update` mode that raises a short-lived, freshness-
+  bounded marker. The primary and watchdog see it, schedule a safety-net relaunch,
+  and exit; the applier backs up the old exe, copies the new one in, re-verifies
+  its hash (rolling back on failure), then relaunches. The safety net guarantees
+  protection returns even if the applier is killed mid-swap.
+
+#### Rejected Alternatives
+
+- **Velopack/Squirrel.** Mature, but imposes its own install layout and a large
+  dependency that conflicts with the bespoke per-user installer and watchdog
+  (ADR-008); a small custom updater fits the existing model better.
+- **Notify-and-prompt or manual "check for updates".** Rejected: a user could
+  decline a fix, and most never click. Silence matches the product's intent.
+- **HTTPS/version check without signing.** Rejected as too weak for a tool that
+  rewrites its own binary; signing prevents a tampered build from being applied.
+
+#### Consequences
+
+- The updater is self-protection-conscious: the stand-down requires a fresh,
+  authentic marker rather than a signal anyone could raise, and a hard-killed
+  applier is recovered by the safety net or next-login autostart (a brief, bounded
+  outage rather than an easy permanent bypass).
+- Self-protection hardening remains incremental: the marker mechanism is friction,
+  not a guarantee against a determined local user (consistent with ADR-001/003).
+- Verifier, manifest parsing, and the no-downgrade/staging decision are unit
+  tested with an ephemeral key; the CI signer and embedded public key are
+  cross-checked to use the same DER/SHA-256 format.
 
 ## Contributing, License, and Security
 

@@ -28,4 +28,8 @@ local-state/
 
 # Published single-file distributable and scratch screenshots
 publish/
-.brb-*
+.brd-*
+
+# Update signing private key (set it as the BRD_UPDATE_PRIVATE_KEY GitHub secret;
+# never commit it). The matching public key is embedded in source.
+tools/release/private-key.b64

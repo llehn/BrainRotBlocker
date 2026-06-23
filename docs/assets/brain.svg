@@ -1,6 +1,6 @@
 <svg viewBox="0 0 260 260" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A melting, hypnotized brain">
   <defs>
-    <radialGradient id="brbGoo" cx="0.5" cy="0.35" r="0.75">
+    <radialGradient id="brdGoo" cx="0.5" cy="0.35" r="0.75">
       <stop offset="0" stop-color="#FBD4E6"/>
       <stop offset="1" stop-color="#EBA6C8"/>
     </radialGradient>
@@ -17,7 +17,7 @@
   </g>
 
   <!-- brain body (lumpy cauliflower) -->
-  <g fill="url(#brbGoo)">
+  <g fill="url(#brdGoo)">
     <ellipse cx="130" cy="122" rx="84" ry="66"/>
     <circle cx="70" cy="66" r="28"/>
     <circle cx="106" cy="56" r="28"/>

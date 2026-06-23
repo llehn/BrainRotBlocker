@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-BrainRotBlocker is pre-1.0 and under active development. Security fixes are
+BrainRotDoctor is pre-1.0 and under active development. Security fixes are
 applied to the latest `main` only.
 
 ## Reporting a vulnerability
@@ -10,9 +10,9 @@ applied to the latest `main` only.
 Please report security issues **privately**, not in public issues or pull
 requests.
 
-- Preferred: open a [GitHub private security advisory](https://github.com/llehn/BrainRotBlocker/security/advisories/new).
+- Preferred: open a [GitHub private security advisory](https://github.com/llehn/BrainRotDoctor/security/advisories/new).
 - Alternatively, email **levlehn@gmail.com** with the subject line
-  `BrainRotBlocker security`.
+  `BrainRotDoctor security`.
 
 Include the affected version/commit, a description of the issue, reproduction
 steps, and the impact. You will normally get an acknowledgement within a few
@@ -21,7 +21,7 @@ disclosure.
 
 ## Scope and threat model
 
-BrainRotBlocker is a local-first Windows application. It has no server
+BrainRotDoctor is a local-first Windows application. It has no server
 component, performs no network requests, and contains no analytics or
 telemetry. Configuration and runtime state are stored under the current user's
 `%LOCALAPPDATA%`. It runs per-user, without administrator privileges.
@@ -52,5 +52,5 @@ ADR-001) is a known, accepted limitation rather than a vulnerability.
 - `Tmds.DBus.Protocol` (a Linux-only transitive dependency of
   `Avalonia.Desktop`) carries advisory **NU1903**. It is never loaded on
   Windows, which is the only supported platform, so the warning is suppressed
-  in `BrainRotBlocker.App.csproj`. It will be removed when an updated Avalonia
+  in `BrainRotDoctor.App.csproj`. It will be removed when an updated Avalonia
   bumps the transitive version.
