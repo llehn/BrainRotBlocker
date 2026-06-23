@@ -5,6 +5,7 @@ using Avalonia.Layout;
 using Avalonia.Media.Imaging;
 using Avalonia.Themes.Fluent;
 using BrainRotDoctor.App.Runtime;
+using BrainRotDoctor.App.Runtime.Update;
 using System.Diagnostics;
 
 namespace BrainRotDoctor.App.Ui;
@@ -95,9 +96,14 @@ internal sealed class InstallerWindow : Window
     {
         try
         {
-            var installer = new Installer(_options);
-            installer.Install();
-            Process.Start(new ProcessStartInfo(installer.InstalledExePath) { UseShellExecute = true });
+            // A fresh install copies and launches here; an upgrade over a running
+            // build hands the swap to the applier, which relaunches the app itself.
+            if (SelfInstall.Run(_options, new DetachedApplyLauncher()))
+            {
+                var installer = new Installer(_options);
+                Process.Start(new ProcessStartInfo(installer.InstalledExePath) { UseShellExecute = true });
+            }
+
             Close();
         }
         catch (Exception ex)

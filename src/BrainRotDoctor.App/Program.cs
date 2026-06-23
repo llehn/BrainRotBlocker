@@ -48,8 +48,10 @@ internal static class Program
 
         if (HasFlag(args, "--install"))
         {
-            installer.Install();
-            if (!HasFlag(args, "--no-launch"))
+            // An upgrade over a running build is handed to the applier (it relaunches);
+            // a fresh copy is launched here unless suppressed.
+            bool launchNow = SelfInstall.Run(installOptions, new DetachedApplyLauncher());
+            if (launchNow && !HasFlag(args, "--no-launch"))
             {
                 System.Diagnostics.Process.Start(
                     new System.Diagnostics.ProcessStartInfo(installer.InstalledExePath) { UseShellExecute = true });

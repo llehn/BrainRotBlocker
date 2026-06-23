@@ -59,8 +59,20 @@ internal sealed class Installer
     public void Install()
     {
         Directory.CreateDirectory(_o.InstallDir);
+        File.Copy(_o.SourceExe, InstalledExePath, overwrite: true);
+        WriteRegistration();
+    }
+
+    /// <summary>
+    /// Writes the autostart value and the "Apps &amp; features" uninstall entry.
+    /// This touches only the registry, not the locked exe, so it is safe to call
+    /// to refresh the recorded version while an older build is still running and
+    /// the binary itself is being swapped through the update applier.
+    /// </summary>
+    public void WriteRegistration()
+    {
+        Directory.CreateDirectory(_o.InstallDir);
         string dest = InstalledExePath;
-        File.Copy(_o.SourceExe, dest, overwrite: true);
 
         using (RegistryKey run = Registry.CurrentUser.CreateSubKey(_o.RunKeyPath))
         {
