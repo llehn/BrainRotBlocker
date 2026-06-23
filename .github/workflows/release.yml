@@ -73,10 +73,30 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $version = "${{ steps.version.outputs.version }}"
-          gh release create "v$version" `
-            --title "v$version" `
+          $tag = "v$version"
+
+          # Static app introduction + install steps, shown on every release.
+          $header = Get-Content -Raw tools/release/release-notes-header.md
+
+          # Changelog from commit subjects since the previous tag. Direct pushes
+          # and squash-merged PRs both land as commits, so this captures both.
+          $prev = git tag --sort=-creatordate | Where-Object { $_ -ne $tag } | Select-Object -First 1
+          if ($prev) {
+            $log = git log "$prev..HEAD" --no-merges --pretty='- %s'
+            $changelog = "## Changes in $tag`n`n" + ($log -join "`n") +
+              "`n`n**Full Changelog**: https://github.com/llehn/BrainRotDoctor/compare/$prev...$tag"
+          } else {
+            $log = git log --no-merges --pretty='- %s'
+            $changelog = "## Changes in $tag`n`n" + ($log -join "`n")
+          }
+
+          $body = $header.TrimEnd() + "`n`n---`n`n" + $changelog
+          Set-Content -Path release-notes.md -Value $body -Encoding utf8
+
+          gh release create $tag `
+            --title $tag `
             --target ${{ github.sha }} `
-            --generate-notes `
+            --notes-file release-notes.md `
             publish/BrainRotDoctor.exe `
             publish/update.json `
             publish/update.json.sig
