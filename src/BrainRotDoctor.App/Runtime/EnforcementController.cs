@@ -16,6 +16,7 @@ internal sealed class EnforcementController : IDisposable
     private string _configurationJson;
     private string? _configurationFilePath;
     private readonly StrictModeStore _strictModeStore;
+    private readonly UsageStore _usageStore;
     private readonly string? _logPath;
     private readonly System.Threading.Timer _timer;
     private readonly object _sync = new();
@@ -32,7 +33,8 @@ internal sealed class EnforcementController : IDisposable
         string configurationJson,
         string? configurationFilePath,
         StrictModeStore strictModeStore,
-        string? logPath = null)
+        string? logPath = null,
+        UsageStore? usageStore = null)
     {
         ArgumentNullException.ThrowIfNull(configuration);
         _observer = observer ?? throw new ArgumentNullException(nameof(observer));
@@ -41,8 +43,13 @@ internal sealed class EnforcementController : IDisposable
         _configurationJson = configurationJson;
         _configurationFilePath = configurationFilePath;
         _strictModeStore = strictModeStore;
+        _usageStore = usageStore ?? new UsageStore();
         _logPath = logPath;
         _engine = new BudgetEngine(configuration);
+        // Pick up the hour's usage left by a previous run / save / update swap so a
+        // restart can't be used to wipe a limit. A record from a past hour is
+        // ignored automatically on the first tick.
+        _engine.RestoreUsage(_usageStore.Load());
         _timer = new System.Threading.Timer(Tick);
         _status = BuildStatus(
             DateTimeOffset.Now,
@@ -122,11 +129,17 @@ internal sealed class EnforcementController : IDisposable
 
         lock (_sync)
         {
-            _engine = new BudgetEngine(configuration);
+            // Carry the hour's usage into the rebuilt engine so saving a rule —
+            // even with no real change — can't reset the time already spent.
+            IReadOnlyList<RuleUsage> carried = _engine.ExportUsage();
+            var rebuilt = new BudgetEngine(configuration);
+            rebuilt.RestoreUsage(carried);
+            _engine = rebuilt;
             _configurationJson = json;
             _configSource = _configurationFilePath;
         }
 
+        PersistUsage();
         Publish(BuildStatus(DateTimeOffset.Now, Status.Windows, _engine.GetRuleSnapshots(DateTimeOffset.Now), Status.LastError));
         return true;
     }
@@ -159,6 +172,7 @@ internal sealed class EnforcementController : IDisposable
         }
 
         _timer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+        PersistUsage();
         Publish(BuildStatus(DateTimeOffset.Now, Status.Windows, Status.Rules, Status.LastError));
     }
 
@@ -202,6 +216,13 @@ internal sealed class EnforcementController : IDisposable
                 {
                     WriteLog(now, $"close failed {window.BrowserName}:{window.WindowId}:{decision.Url.AbsoluteUri}:{decision.RuleId}");
                 }
+            }
+
+            // Only an active (charged) tick changes the numbers, so persist then —
+            // not every idle second. The hour's usage thus survives a later restart.
+            if (result.Rules.Any(rule => rule.WasActiveThisTick))
+            {
+                PersistUsage();
             }
 
             Publish(BuildStatus(now, windows, result.Rules, lastError: null));
@@ -255,6 +276,8 @@ internal sealed class EnforcementController : IDisposable
                 lastError);
         }
     }
+
+    private void PersistUsage() => _usageStore.Save(_engine.ExportUsage());
 
     private void Publish(AppStatus status)
     {

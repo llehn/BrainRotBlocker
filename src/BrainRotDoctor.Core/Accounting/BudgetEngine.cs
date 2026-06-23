@@ -3,6 +3,14 @@ using BrainRotDoctor.Core.Configuration;
 namespace BrainRotDoctor.Core.Accounting;
 
 /// <summary>
+/// A snapshot of one allowance rule's usage, used to carry the current hour's
+/// consumption across a config save, an app restart, or an update swap. The
+/// <see cref="HourStart"/> tags which clock hour the consumption belongs to so a
+/// stale record from an earlier hour is discarded rather than wrongly applied.
+/// </summary>
+public readonly record struct RuleUsage(string RuleId, DateTimeOffset HourStart, TimeSpan Consumed);
+
+/// <summary>
 /// The deterministic core of the product: given the selected tab of every open
 /// browser window and the current time, it decides which selected tabs must be
 /// closed because a rule blocks the site they show.
@@ -108,6 +116,42 @@ public sealed class BudgetEngine
     public IReadOnlyList<RuleSnapshot> GetRuleSnapshots(DateTimeOffset now)
         => BuildSnapshots(now, activeRules: null);
 
+    /// <summary>
+    /// The current hour's consumption of every allowance rule, for persistence.
+    /// Block-completely rules carry no usage and are omitted.
+    /// </summary>
+    public IReadOnlyList<RuleUsage> ExportUsage()
+    {
+        var usage = new List<RuleUsage>();
+        foreach (Rule rule in _configuration.Rules)
+        {
+            if (!rule.BlocksCompletely)
+            {
+                usage.Add(_states[rule.Id].ToUsage(rule.Id));
+            }
+        }
+
+        return usage;
+    }
+
+    /// <summary>
+    /// Seeds rules with previously recorded usage (by rule id). Records for rules
+    /// this engine doesn't have are ignored. A record from a past clock hour is
+    /// harmless: the next <see cref="Tick"/> rolls the rule and clears it, so a new
+    /// hour always starts fresh.
+    /// </summary>
+    public void RestoreUsage(IEnumerable<RuleUsage> usage)
+    {
+        ArgumentNullException.ThrowIfNull(usage);
+        foreach (RuleUsage record in usage)
+        {
+            if (_states.TryGetValue(record.RuleId, out RuleRuntime? state))
+            {
+                state.Restore(record.HourStart, record.Consumed);
+            }
+        }
+    }
+
     private TimeSpan ComputeElapsed(DateTimeOffset now)
     {
         if (_lastTick is not { } last)
@@ -199,6 +243,21 @@ public sealed class BudgetEngine
             {
                 _consumed = _rule.Allowance.Value;
             }
+        }
+
+        public RuleUsage ToUsage(string ruleId) => new(ruleId, _hourStart, _consumed);
+
+        public void Restore(DateTimeOffset hourStart, TimeSpan consumed)
+        {
+            if (_rule.BlocksCompletely)
+            {
+                return;
+            }
+
+            _hourStart = hourStart;
+            _consumed = consumed > _rule.Allowance!.Value ? _rule.Allowance.Value
+                : consumed < TimeSpan.Zero ? TimeSpan.Zero
+                : consumed;
         }
 
         public RuleSnapshot ToSnapshot(DateTimeOffset now, bool wasActiveThisTick)

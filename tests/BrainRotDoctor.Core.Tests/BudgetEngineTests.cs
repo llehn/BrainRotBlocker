@@ -160,6 +160,62 @@ public class BudgetEngineTests
     }
 
     [Fact]
+    public void Restored_usage_carries_into_a_rebuilt_engine_within_the_same_hour()
+    {
+        // Spend 4s, then rebuild the engine (as a config save does) and hand it the
+        // exported usage: the consumption must survive, not reset to zero.
+        var first = Engine(allowance: TimeSpan.FromSeconds(10));
+        first.Tick(Windows(Win("w1", Shorts)), T0);
+        first.Tick(Windows(Win("w1", Shorts)), T0 + TimeSpan.FromSeconds(4));
+
+        var rebuilt = Engine(allowance: TimeSpan.FromSeconds(10));
+        rebuilt.RestoreUsage(first.ExportUsage());
+
+        // Baseline tick charges nothing; the restored 4s is already present.
+        TickResult r = rebuilt.Tick(Windows(Win("w1", Shorts)), T0 + TimeSpan.FromSeconds(4));
+        Assert.Equal(TimeSpan.FromSeconds(4), Consumed(r));
+    }
+
+    [Fact]
+    public void Restored_usage_from_a_past_hour_is_cleared_on_the_next_tick()
+    {
+        var first = Engine(allowance: TimeSpan.FromSeconds(10));
+        first.Tick(Windows(Win("w1", Shorts)), T0);
+        first.Tick(Windows(Win("w1", Shorts)), T0 + TimeSpan.FromSeconds(4));
+
+        var rebuilt = Engine(allowance: TimeSpan.FromSeconds(10));
+        rebuilt.RestoreUsage(first.ExportUsage());
+
+        // An hour later the saved usage belongs to a past clock hour and is dropped.
+        TickResult r = rebuilt.Tick(Windows(Win("w1", Shorts)), T0 + TimeSpan.FromHours(1));
+        Assert.Equal(TimeSpan.Zero, Consumed(r));
+        Assert.Empty(r.CloseDecisions);
+    }
+
+    [Fact]
+    public void Restore_ignores_usage_for_unknown_rules()
+    {
+        var engine = Engine(allowance: TimeSpan.FromSeconds(10));
+        engine.RestoreUsage(new[] { new RuleUsage("nonexistent", T0, TimeSpan.FromSeconds(5)) });
+
+        engine.Tick(Windows(Win("w1", Shorts)), T0);
+        TickResult r = engine.Tick(Windows(Win("w1", Shorts)), T0 + TimeSpan.FromSeconds(2));
+        Assert.Equal(TimeSpan.FromSeconds(2), Consumed(r));
+    }
+
+    [Fact]
+    public void Block_completely_rules_export_no_usage()
+    {
+        var rule = new Rule(
+            "bedtime", "Bedtime",
+            new[] { Site("instagram.com") },
+            allowance: null, allDay: true, default, default, null);
+        var engine = new BudgetEngine(new BlockerConfiguration(new[] { rule }));
+
+        Assert.Empty(engine.ExportUsage());
+    }
+
+    [Fact]
     public void Snapshot_reports_remaining_for_an_allowance_rule()
     {
         var engine = Engine(allowance: TimeSpan.FromSeconds(10));
