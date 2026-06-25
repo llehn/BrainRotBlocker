@@ -836,7 +836,7 @@ bypass), and the existing watchdog (ADR-008 lineage) respawns the primary within
 ## Contributing, License, and Security
 
 Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for build,
-test, and coding-standard guidance, and the [Code of Conduct](CODE_OF_CONDUCT.md).
+test, and coding-standard guidance.
 
 Licensed under the [MIT License](LICENSE).
 

@@ -3,11 +3,6 @@
 Thanks for your interest in contributing! This document explains how to build,
 test, and propose changes.
 
-## Code of Conduct
-
-This project follows the [Contributor Covenant](CODE_OF_CONDUCT.md). By
-participating you agree to uphold it.
-
 ## Prerequisites
 
 - **.NET 10 SDK** (LTS). Check with `dotnet --version`.
